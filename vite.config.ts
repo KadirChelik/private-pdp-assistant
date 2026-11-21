@@ -1,0 +1,47 @@
+import fs from 'node:fs'
+import path from 'node:path'
+import { defineConfig, type Plugin } from 'vite'
+
+function emitDemoHtmlPlugin(): Plugin {
+  return {
+    name: 'emit-demo-html',
+    closeBundle() {
+      const distDir = path.resolve(process.cwd(), 'dist')
+      const rawHtml = fs.readFileSync(path.resolve(process.cwd(), 'index.html'), 'utf8')
+      const builtHtml = rawHtml.replace(
+        /<script\s+type="module"\s+src="\/src\/main\.ts"><\/script>/,
+        '<script src="/private-pdp-assistant.js" defer></script>',
+      )
+      fs.writeFileSync(path.join(distDir, 'index.html'), builtHtml, 'utf8')
+
+      const faviconSrc = path.resolve(process.cwd(), 'public', 'favicon.svg')
+      if (fs.existsSync(faviconSrc)) {
+        fs.copyFileSync(faviconSrc, path.join(distDir, 'favicon.svg'))
+      }
+    },
+  }
+}
+
+export default defineConfig({
+  publicDir: false,
+  plugins: [emitDemoHtmlPlugin()],
+  server: {
+    cors: true,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+    },
+  },
+  build: {
+    lib: {
+      entry: 'src/main.ts',
+      name: 'PrivatePDPAssistantBundle',
+      formats: ['iife'],
+      fileName: () => 'private-pdp-assistant.js',
+    },
+    target: 'es2020',
+    emptyOutDir: true,
+    cssCodeSplit: false,
+    sourcemap: true,
+    minify: 'oxc',
+  },
+})
