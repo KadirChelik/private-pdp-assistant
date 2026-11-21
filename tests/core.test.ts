@@ -473,3 +473,135 @@ test('generic non-furniture product extraction and retrieval match specs/reviews
     restore()
   }
 })
+
+test('What is it made of detects material intent and retrieves material spec', async () => {
+  assert.equal(detectQuestionIntent('What is it made of?'), 'material')
+  const { buildEvidenceIndex } = await import('../src/nano.ts')
+  const context: ProductContext = {
+    url: 'https://example.test/pack',
+    title: 'Terra Trail Pack 28L',
+    specs: {
+      Capacity: '28 litres',
+      Weight: '980 g',
+      Material: 'Recycled ripstop nylon',
+    },
+  }
+  const hits = retrieveEvidence('What is it made of?', buildEvidenceIndex(context))
+  assert.ok(hits.some((item) => item.value.includes('Recycled ripstop nylon')))
+})
+
+test('answerQuestion preserves multi-part capacity and weight evidence and uses compact prompt', async () => {
+  let capturedPrompt = ''
+  const session: LanguageModelSession = {
+    prompt: async (prompt) => {
+      capturedPrompt = prompt
+      return 'It holds 28 litres and weighs 980 g.'
+    },
+    destroy: () => undefined,
+  }
+  const context: ProductContext = {
+    url: 'https://example.test/pack',
+    title: 'Terra Trail Pack 28L',
+    specs: {
+      Capacity: '28 litres',
+      Weight: '980 g',
+      Warranty: 'Lifetime repairs',
+    },
+  }
+
+  const answer = await answerQuestion(session, context, 'What is the capacity and weight?')
+  assert.match(answer, /28 litres/)
+  assert.match(capturedPrompt, /28 litres/)
+  assert.match(capturedPrompt, /980 g/)
+  assert.ok(capturedPrompt.length < 1800, `Expected compact prompt < 1800 chars, got ${capturedPrompt.length}`)
+})
+
+test('answerQuestion returns not found without calling model when no evidence matches', async () => {
+  let calls = 0
+  const session: LanguageModelSession = {
+    prompt: async () => {
+      calls += 1
+      return 'Should not be called'
+    },
+    destroy: () => undefined,
+  }
+  const context: ProductContext = {
+    url: 'https://example.test/pack',
+    title: 'Terra Trail Pack 28L',
+    description: 'A weather-resistant daypack built for long trails and contoured shoulder straps.',
+    specs: {
+      Capacity: '28 litres',
+      Weight: '980 g',
+    },
+  }
+
+  assert.equal(
+    await answerQuestion(session, context, 'Does it come in red?'),
+    'I could not find this information on the product page.',
+  )
+  assert.equal(
+    await answerQuestion(session, context, 'Does it support Bluetooth?'),
+    'I could not find this information on the product page.',
+  )
+  assert.equal(calls, 0)
+})
+
+test('answerQuestion trims evidence dynamically when session inputQuota is tight', async () => {
+  let capturedPrompt = ''
+  const session: LanguageModelSession = {
+    inputQuota: 420,
+    inputUsage: 0,
+    measureInputUsage: async (input) => Math.ceil(input.length / 4),
+    prompt: async (prompt) => {
+      capturedPrompt = prompt
+      return 'It has a 4.8/5 rating from 3 reviews.'
+    },
+    destroy: () => undefined,
+  }
+  const context: ProductContext = {
+    url: 'https://example.test/pack',
+    title: 'Terra Trail Pack 28L',
+    rating: '4.8',
+    reviewCount: 3,
+    specs: {},
+    reviews: [
+      { rating: 5, body: 'Light on the shoulders even on 18 km day hikes and stays comfortable all day long on steep climbs.' },
+      { rating: 5, body: 'Fits my 16-inch laptop neatly in the padded sleeve with extra space left for rain gear and snacks.' },
+      { rating: 4, body: 'Tough ripstop fabric handles wet trail conditions very well across multiple weekend trips.' },
+    ],
+  }
+
+  await answerQuestion(session, context, 'How are the reviews?')
+  const finalTokens = Math.ceil(capturedPrompt.length / 4)
+  assert.ok(finalTokens <= 260, `Expected trimmed prompt tokens <= 260, got ${finalTokens}`)
+  assert.ok(!capturedPrompt.includes('16-inch laptop'), 'Expected lowest-ranked review to be trimmed to fit quota')
+})
+
+test('Turkish inflected questions map to expected intents', () => {
+  assert.equal(detectQuestionIntent('Fiyatı nedir?'), 'price')
+  assert.equal(detectQuestionIntent('Malzemesi nedir?'), 'material')
+  assert.equal(detectQuestionIntent('Yorumları nasıl?'), 'reviews')
+  assert.equal(detectQuestionIntent('Renkleri neler?'), 'color')
+  assert.equal(detectQuestionIntent('Ölçüleri ve boyutları nedir?'), 'dimensions')
+})
+
+test('answerQuestion rejects Chromium echo stub responses with NotSupportedError', async () => {
+  const session: LanguageModelSession = {
+    prompt: async (prompt) =>
+      `On-device model is not available in Chromium, this API is just echoing back the input: ${prompt}`,
+    destroy: () => undefined,
+  }
+  const context: ProductContext = {
+    url: 'https://example.test/pack',
+    title: 'Terra Trail Pack 28L',
+    listedPrice: '129.00 USD',
+    specs: { Capacity: '28 litres' },
+  }
+
+  await assert.rejects(
+    () => answerQuestion(session, context, 'What is the price?'),
+    (error: unknown) =>
+      error instanceof DOMException &&
+      error.name === 'NotSupportedError',
+  )
+})

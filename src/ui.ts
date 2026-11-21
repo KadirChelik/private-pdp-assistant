@@ -77,11 +77,20 @@ export class AssistantWidget {
     this.disposed = true
     this.abort?.abort()
     this.initAbort?.abort()
-    this.session?.destroy()
+    this.destroyBaseSession()
     this.languageBridge?.destroy()
-    this.session = undefined
     this.languageBridge = undefined
     this.host.remove()
+  }
+
+  private destroyBaseSession(): void {
+    try {
+      this.session?.destroy()
+    } catch {
+      // Ignore already-destroyed session handles.
+    }
+    this.session = undefined
+    this.sessionTurns = 0
   }
 
   private bind(): void {
@@ -245,8 +254,58 @@ export class AssistantWidget {
     }
   }
 
+  private async runTurnPrompt(
+    context: ProductContext,
+    question: string,
+    bridge: AnswerLanguageBridge | undefined,
+    translateOutput: boolean,
+    signal: AbortSignal,
+    maxEvidenceItems?: number,
+  ): Promise<string> {
+    if (!this.session) {
+      this.session = await createSession()
+      this.sessionTurns = 0
+    }
+
+    let turnSession = this.session
+    let isEphemeral = false
+
+    if (typeof this.session.clone === 'function') {
+      turnSession = await this.session.clone({ signal })
+      isEphemeral = true
+    } else if (this.sessionTurns > 0) {
+      this.destroyBaseSession()
+      this.session = await createSession()
+      turnSession = this.session
+    }
+
+    try {
+      const answer = await answerQuestion(
+        turnSession,
+        context,
+        question,
+        signal,
+        bridge,
+        translateOutput,
+        maxEvidenceItems,
+      )
+      if (!isEphemeral) {
+        this.sessionTurns += 1
+      }
+      return answer
+    } finally {
+      if (isEphemeral) {
+        try {
+          turnSession.destroy()
+        } catch {
+          // Ignore clone cleanup failures.
+        }
+      }
+    }
+  }
+
   private async ask(question: string): Promise<void> {
-    if (this.disposed || !question || !this.session || this.busy) return
+    if (this.disposed || !question || this.busy || (!this.session && !supportsNano())) return
     const input = this.q<HTMLInputElement>('input')
     this.busy = true
     this.q<HTMLButtonElement>('.pdp-send').disabled = true
@@ -258,7 +317,7 @@ export class AssistantWidget {
     }
     const productKey = this.productKey(context)
     const productChanged = productKey !== this.sessionProductKey
-    const needsFreshSession = productChanged || this.sessionTurns >= 4
+    const needsFreshSession = !this.session || productChanged
     const freshSessionPromise = needsFreshSession
       ? createSession((percent) => {
           if (!this.disposed && productChanged) this.showDownload(percent, false)
@@ -273,7 +332,7 @@ export class AssistantWidget {
     try {
       const [freshSession, freshBridge] = await Promise.all([freshSessionPromise, bridgePromise])
       if (freshSession) {
-        this.session.destroy()
+        this.destroyBaseSession()
         this.session = freshSession
         this.sessionProductKey = productKey
         this.sessionTurns = 0
@@ -304,10 +363,21 @@ export class AssistantWidget {
     this.abort = new AbortController()
     try {
       const bridge = (isTurkishText(question) || this.contextNeedsTurkish(context)) ? this.languageBridge : undefined
-      const answer = await answerQuestion(this.session, context, question, this.abort.signal, bridge, isTurkishText(question))
+      const translateOutput = isTurkishText(question)
+      let answer: string
+      try {
+        answer = await this.runTurnPrompt(context, question, bridge, translateOutput, this.abort.signal)
+      } catch (firstError) {
+        if (firstError instanceof DOMException && firstError.name === 'QuotaExceededError') {
+          this.destroyBaseSession()
+          this.session = await createSession()
+          answer = await this.runTurnPrompt(context, question, bridge, translateOutput, this.abort.signal, 2)
+        } else {
+          throw firstError
+        }
+      }
       thinking.remove()
       this.appendMessage(answer, 'assistant')
-      this.sessionTurns += 1
     } catch (error) {
       thinking.remove()
       if ((error as DOMException).name !== 'AbortError') {
@@ -315,8 +385,12 @@ export class AssistantWidget {
           console.error('[PDP Assistant] Answer failed:', error)
         }
         if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-          this.session.destroy()
-          this.sessionTurns = 4
+          this.destroyBaseSession()
+        }
+        if (error instanceof DOMException && error.name === 'NotSupportedError' && error.message === LOCAL_AI_UNAVAILABLE_MESSAGE) {
+          this.destroyBaseSession()
+          this.showUnsupported(context)
+          return
         }
         const message = error instanceof DOMException && error.name === 'NotSupportedError'
           ? (isTurkishText(question) ? TURKISH_TRANSLATION_UNAVAILABLE : 'This language or input is not supported by the local model.')

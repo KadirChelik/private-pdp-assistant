@@ -179,6 +179,10 @@ export interface RetrievedEvidence {
 }
 
 export interface LanguageModelSession {
+  inputQuota?: number
+  inputUsage?: number
+  measureInputUsage?(input: string, options?: { signal?: AbortSignal }): Promise<number>
+  clone?(options?: { signal?: AbortSignal }): Promise<LanguageModelSession>
   prompt(input: string, options?: { signal?: AbortSignal }): Promise<string>
   promptStreaming?(
     input: string,
