@@ -50,6 +50,7 @@ export type QuestionIntent =
   | 'assembly'
   | 'parts'
   | 'delivery'
+  | 'returnPolicy'
   | 'suitability'
   | 'material'
   | 'unknown'
@@ -236,6 +237,42 @@ const STOP_WORDS = new Set([
   'that',
   'with',
   'from',
+  'good',
+  'bad',
+  'best',
+  'well',
+  'very',
+  'really',
+  'just',
+  'also',
+  'will',
+  'would',
+  'could',
+  'should',
+  'right',
+  'now',
+  'any',
+  'some',
+  'your',
+  'my',
+  'its',
+  'they',
+  'them',
+  'their',
+  'there',
+  'here',
+  'when',
+  'where',
+  'which',
+  'who',
+  'why',
+  'get',
+  'use',
+  'come',
+  'comes',
+  'bag',
+  'item',
+  'one',
 ])
 
 function tokens(value: string): string[] {
@@ -330,9 +367,20 @@ function isReviewContext(value: string): boolean {
     /\bkullanan\b/,
     /\bmemnun/,
     /\bpuan/,
+    /\bsikayet/,
+    /\bolumsuz/,
+    /\beksi/,
+    /\barti\b/,
     /\breview/,
     /\bfeedback\b/,
     /\bcustomer/,
+    /\bcomplaint/,
+    /\bdownside/,
+    /\bcons\b/,
+    /\bpros\b/,
+    /\bnegative/,
+    /\bpositive/,
+    /\bbuyer/,
   ])
 }
 
@@ -383,8 +431,18 @@ function isDeliveryContext(value: string): boolean {
     /\beve teslim\b/,
     /\bmagazadan teslim\b/,
     /\bdelivery\b/,
-    /\bshipping\b/,
+    /\bship/,
     /\bstore pickup\b/,
+  ])
+}
+
+function isReturnContext(value: string): boolean {
+  return hasAny(value, [
+    /\biade/,
+    /\bgeri gonder/,
+    /\breturn\b/,
+    /\breturns\b/,
+    /\brefund/,
   ])
 }
 
@@ -432,6 +490,7 @@ export function detectQuestionIntent(question: string): QuestionIntent {
   }
 
   if (isDimensionContext(value)) return 'dimensions'
+  if (isReturnContext(value)) return 'returnPolicy'
   if (isDeliveryContext(value)) return 'delivery'
   if (isSuitabilityContext(value)) return 'suitability'
   if (isReviewContext(value)) return 'reviews'
@@ -448,7 +507,7 @@ export function detectQuestionIntent(question: string): QuestionIntent {
     return 'capacity'
   }
 
-  if (hasAny(value, [/\brenk/, /\brengi/, /\bcolor\b/, /\bcolour\b/])) {
+  if (hasAny(value, [/\brenk/, /\brengi/, /\bcolou?r/])) {
     return 'color'
   }
 
@@ -460,7 +519,8 @@ export function detectQuestionIntent(question: string): QuestionIntent {
   if (
     /\bne kadar\b/.test(value) &&
     !isDimensionContext(value) &&
-    !isOpenedBedContext(value)
+    !isOpenedBedContext(value) &&
+    !hasAny(value, [/\bagirli/, /\bkilo/, /\bgram/, /\bhafif/, /\bgaranti/, /\bkargo/, /\bteslim/, /\bgun\b/, /\bkapasite/, /\blitre/, /\bsure/, /\bsaat/])
   ) {
     return 'price'
   }
@@ -498,8 +558,8 @@ function splitDescriptionSentences(text: string | undefined): string[] {
   if (!text) return []
 
   return text
-    .replace(/\s+/g, ' ')
-    .split(/(?<=[.!?])\s+|(?:\n+)/)
+    .split(/\r?\n+/)
+    .flatMap((line) => clean(line).split(/(?<=[.!?])\s+/))
     .map(clean)
     .filter((sentence) => sentence.length >= 12)
     .map((sentence) => compact(sentence, 360))
@@ -757,15 +817,52 @@ export function buildEvidenceIndex(context: ProductContext): EvidenceItem[] {
 
   addEvidence(items, 'shipping', 'Shipping fee', context.shippingFee, 'shipping details')
 
+  const structuredTexts = items
+    .filter((entry) =>
+      [
+        'review',
+        'descriptionSentence',
+        'spec',
+        'descriptionSpec',
+        'title',
+        'brand',
+        'price',
+        'basketPrice',
+        'promotion',
+        'qna',
+      ].includes(entry.type),
+    )
+    .map((entry) => normalize(entry.value))
+    .filter((value) => value.length >= 16)
+
+  const isDuplicateVisibleText = (trimmed: string): boolean => {
+    const norm = normalize(trimmed)
+    if (!norm) return true
+    return structuredTexts.some(
+      (existing) =>
+        existing === norm ||
+        existing.includes(norm) ||
+        (norm.length >= 24 && norm.includes(existing)),
+    )
+  }
+
   for (const text of context.visibleTextEvidence || []) {
     const trimmed = clean(text)
-    if (trimmed.length < 24 || trimmed.split(/\s+/).length < 3) continue
+    if (trimmed.length < 24 || trimmed.split(/\s+/).length < 3 || isDuplicateVisibleText(trimmed)) {
+      continue
+    }
     addEvidence(items, 'descriptionSentence', 'Visible page text', trimmed, 'visible PDP text')
   }
 
   if (context.visibleTextSample) {
     for (const sentence of splitDescriptionSentences(context.visibleTextSample).slice(0, 20)) {
-      if (sentence.length < 24 || sentence.split(/\s+/).length < 3) continue
+      if (
+        sentence.length < 24 ||
+        sentence.split(/\s+/).length < 3 ||
+        isDuplicateVisibleText(sentence)
+      ) {
+        continue
+      }
       addEvidence(items, 'descriptionSentence', 'Visible page text', sentence, 'visible PDP text')
     }
   }
@@ -938,9 +1035,48 @@ function expandedQuestionTerms(question: string, intent: QuestionIntent): string
     ].forEach((term) => terms.add(term))
   }
 
-  if (/garanti|warranty/.test(value)) {
-    terms.add('garanti')
-    terms.add('warranty')
+  if (/garanti|warranty|repair|breaks|rips|damaged|tamir|bozul/.test(value)) {
+    ;['warranty', 'repairs', 'repair', 'garanti'].forEach((term) => terms.add(term))
+  }
+
+  if (/heavy|lightweight|weight|agirli|hafif|kilo|gram/.test(value)) {
+    ;['weight', 'agirlik', 'light', 'gram', 'kg'].forEach((term) => terms.add(term))
+  }
+
+  if (/who makes|maker|manufacturer|marka|brand/.test(value)) {
+    ;['brand', 'marka'].forEach((term) => terms.add(term))
+  }
+
+  if (
+    (intent === 'unknown' || intent === 'delivery') &&
+    /availab|in stock|stok|mevcut/.test(value) &&
+    !/\b(colou?r|size|sizes|option|options|model|models|renk|secenek)\b/.test(value)
+  ) {
+    ;['availability', 'instock', 'stock', 'stok', 'ships'].forEach((term) => terms.add(term))
+  }
+
+  if (/\bship|kargo|teslim|deliver/.test(value)) {
+    ;['shipping', 'ships', 'delivery', 'kargo', 'teslimat', 'availability', 'stock', 'instock', 'stok'].forEach((term) => terms.add(term))
+  }
+
+  if (/waterproof|water resistant|rain|wet|weather|yagmur|su gecirmez|suya/.test(value) && !/rain\s*cover|yagmurluk/.test(value)) {
+    ;['weather', 'resistant', 'waterproof', 'wet', 'rain', 'ripstop'].forEach((term) => terms.add(term))
+  }
+
+  if (/ventilat|breathab|havalandir|terlet|comfort|straps|ergonomic|rahat/.test(value)) {
+    ;['ventilated', 'ventilation', 'back', 'panel', 'straps', 'comfortable'].forEach((term) => terms.add(term))
+  }
+
+  if (/macbook|notebook|laptop|bilgisayar/.test(value)) {
+    ;['laptop', 'sleeve', 'inches', 'inch'].forEach((term) => terms.add(term))
+  }
+
+  if (/pocket|compartment|cep|bolme/.test(value)) {
+    ;['pocket', 'sleeve', 'compartment'].forEach((term) => terms.add(term))
+  }
+
+  if (/iade|geri gonder|return|refund/.test(value)) {
+    ;['return', 'returns', 'return window', 'refund', 'iade'].forEach((term) => terms.add(term))
   }
 
   return Array.from(terms)
@@ -983,7 +1119,9 @@ function preferredTypesForIntent(intent: QuestionIntent): EvidenceItem['type'][]
     case 'parts':
       return ['part', 'assembly', 'descriptionSentence', 'descriptionSpec', 'spec']
     case 'delivery':
-      return ['shipping', 'descriptionSentence', 'qna', 'spec']
+      return ['shipping', 'availability', 'descriptionSentence', 'qna', 'spec']
+    case 'returnPolicy':
+      return ['returnPolicy', 'qna', 'descriptionSentence']
     case 'suitability':
       return ['title', 'category', 'spec', 'descriptionSpec', 'descriptionSentence', 'feature', 'dimension', 'material', 'review']
     case 'material':
@@ -1032,14 +1170,24 @@ function shouldSuppressEvidence(
     return true
   }
 
+  if (
+    intent === 'returnPolicy' &&
+    item.type !== 'returnPolicy' &&
+    !/iade|return|refund|degisim|geri\s*gonder/i.test(item.searchableText)
+  ) {
+    return true
+  }
+
   return false
 }
 
 const SPECIFIC_ATTRIBUTE_INTENTS: ReadonlySet<QuestionIntent> = new Set([
+  'dimensions',
   'color',
   'storage',
   'capacity',
   'delivery',
+  'returnPolicy',
   'openedBedDimensions',
 ])
 
@@ -1121,7 +1269,11 @@ function scoreEvidence(question: string, item: EvidenceItem, intent: QuestionInt
     }
   }
 
-  if (intent === 'delivery' && /teslim|teslimat|kargo|delivery|shipping|pickup|magaza/.test(combined)) {
+  if (intent === 'delivery' && /teslim|teslimat|kargo|delivery|shipping|ships|stock|instock|stok|availability|pickup|magaza/.test(combined)) {
+    score += 38
+  }
+
+  if (intent === 'returnPolicy' && /iade|return|refund/.test(combined)) {
     score += 38
   }
 
@@ -1377,7 +1529,7 @@ function refineEvidence(question: string, items: EvidenceItem[]): EvidenceItem[]
     if (exact.length) return exact.slice(0, 5)
   }
   if (intent === 'delivery') {
-    return items.filter((item) => /teslim|teslimat|kargo|delivery|shipping|pickup|magaza/.test(normalize(`${item.label || ''} ${item.value}`))).slice(0, 6)
+    return items.filter((item) => /teslim|teslimat|kargo|delivery|shipping|ships|stock|instock|stok|availability|pickup|magaza/.test(normalize(`${item.label || ''} ${item.value}`))).slice(0, 6)
   }
   if (intent === 'reviews') {
     const priority = (item: EvidenceItem): number => {
