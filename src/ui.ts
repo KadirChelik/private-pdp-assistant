@@ -1,12 +1,26 @@
 import { extractProductContext, getSuggestedQuestions, hasProductContext } from './extractor'
-import { answerQuestion, createSession, isTurkishText, LOCAL_AI_UNAVAILABLE_MESSAGE, supportsNano } from './nano'
+import {
+  buildLocalExtractiveAnswer,
+  getAssistantMode,
+  requestCloudAnswer,
+  resolveApiEndpoint,
+} from './fallback'
+import {
+  answerQuestion,
+  createSession,
+  isNanoReadyImmediately,
+  isTurkishText,
+  prepareQuestionEvidence,
+} from './nano'
 import { styles } from './styles'
-import { createTurkishBridge, TURKISH_TRANSLATION_UNAVAILABLE } from './translation'
+import { createTurkishBridge } from './translation'
 import type { AnswerLanguageBridge } from './translation'
 import type { LanguageModelSession, ProductContext } from './types'
 
 const robotIcon = `<svg viewBox="0 0 24 24" aria-hidden="true" class="pdp-robot-icon"><path d="M12 3v3"/><circle cx="12" cy="3" r="1"/><rect x="4.5" y="6" width="15" height="12.5" rx="4"/><path d="M4.5 11H3m18 0h-1.5M9 15h6"/><circle cx="9" cy="11.5" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="11.5" r="1" fill="currentColor" stroke="none"/></svg>`
 const sendIcon = `<svg viewBox="0 0 24 24" fill="none"><path d="m4 12 16-8-6 16-2.6-5.4L4 12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`
+
+type RuntimeMode = 'nano' | 'hybrid' | 'offline'
 
 function buildKeyFacts(context: ProductContext): string[] {
   const facts: string[] = []
@@ -37,12 +51,16 @@ function buildKeyFacts(context: ProductContext): string[] {
 export class AssistantWidget {
   private host: HTMLDivElement
   private root: ShadowRoot
+  private scriptOrigin?: string
   private session?: LanguageModelSession
   private abort?: AbortController
   private initAbort?: AbortController
   private languageBridge?: AnswerLanguageBridge
   private sessionProductKey?: string
   private sessionTurns = 0
+  private ready = false
+  private nanoStubDetected = false
+  private currentRuntime: RuntimeMode = 'hybrid'
   private busy = false
   private initializing = false
   private disposed = false
@@ -56,8 +74,9 @@ export class AssistantWidget {
   }
   private suppressSuggestionClick = false
 
-  constructor(host: HTMLDivElement) {
+  constructor(host: HTMLDivElement, scriptOrigin?: string) {
     this.host = host
+    this.scriptOrigin = scriptOrigin
     this.root = this.host.attachShadow({ mode: 'open' })
   }
 
@@ -66,9 +85,9 @@ export class AssistantWidget {
     this.root.innerHTML = `<style>${styles}</style>
       <button class="pdp-launcher" aria-label="Open product assistant" aria-expanded="false" aria-controls="pdp-assistant-panel">${robotIcon}<span class="pdp-launcher-ring"></span></button>
       <section id="pdp-assistant-panel" class="pdp-panel pdp-hidden" role="dialog" aria-modal="true" aria-label="Product assistant">
-        <header class="pdp-header"><div class="pdp-mark">${robotIcon}</div><div class="pdp-heading"><strong>Private PDP Assist</strong><span><i class="pdp-dot"></i> On-device product intelligence</span></div><button class="pdp-icon pdp-close" aria-label="Close"><span aria-hidden="true">×</span></button></header>
+        <header class="pdp-header"><div class="pdp-mark">${robotIcon}</div><div class="pdp-heading"><strong>Private PDP Assist</strong><span class="pdp-header-sub"><i class="pdp-dot"></i> Local-first product assistant</span></div><button class="pdp-icon pdp-close" aria-label="Close"><span aria-hidden="true">×</span></button></header>
         <main class="pdp-body" aria-live="polite"></main>
-        <footer class="pdp-composer pdp-hidden"><div class="pdp-suggestions" aria-label="Suggested questions"></div><form class="pdp-form"><input aria-label="Ask about this product" placeholder="Ask about this product…" maxlength="500" autocomplete="off"><button class="pdp-send" aria-label="Send" disabled>${sendIcon}</button></form><div class="pdp-privacy">Product content is processed locally on this device</div></footer>
+        <footer class="pdp-composer pdp-hidden"><div class="pdp-suggestions" aria-label="Suggested questions"></div><form class="pdp-form"><input aria-label="Ask about this product" placeholder="Ask about this product…" maxlength="500" autocomplete="off"><button class="pdp-send" aria-label="Send" disabled>${sendIcon}</button></form><div class="pdp-privacy">Local retrieval · Only matched facts leave device when cloud needed</div></footer>
       </section>`
     this.bind()
   }
@@ -81,6 +100,31 @@ export class AssistantWidget {
     this.languageBridge?.destroy()
     this.languageBridge = undefined
     this.host.remove()
+  }
+
+  refresh(): void {
+    if (this.disposed || this.busy) return
+    const context = extractProductContext()
+    const panel = this.q<HTMLElement>('.pdp-panel')
+    const isOpen = !panel.classList.contains('pdp-hidden')
+    if (!hasProductContext(context)) {
+      this.ready = false
+      if (isOpen) {
+        this.showState('empty', 'No product found', 'I couldn’t find enough visible product information on this page.')
+      }
+      return
+    }
+    const nextKey = this.productKey(context)
+    const changed = nextKey !== this.sessionProductKey
+    this.sessionProductKey = nextKey
+    if (isOpen) {
+      if (changed || !this.ready) {
+        this.ready = true
+        this.showReady(context, false)
+      }
+    } else if (changed) {
+      this.ready = false
+    }
   }
 
   private destroyBaseSession(): void {
@@ -101,7 +145,15 @@ export class AssistantWidget {
       launcher.setAttribute('aria-expanded', String(open))
       if (open) {
         this.q<HTMLButtonElement>('.pdp-close').focus()
-        if (!this.session) void this.initialize()
+        if (!this.ready) {
+          void this.initialize()
+        } else {
+          const context = extractProductContext()
+          if (hasProductContext(context) && this.productKey(context) !== this.sessionProductKey) {
+            this.sessionProductKey = this.productKey(context)
+            this.showReady(context)
+          }
+        }
       }
     })
     this.q('.pdp-close').addEventListener('click', () => this.closePanel())
@@ -214,40 +266,44 @@ export class AssistantWidget {
   private async initialize(): Promise<void> {
     if (this.initializing) return
     this.initializing = true
-    let context: ProductContext = { url: location.href, specs: {} }
     try {
-      context = extractProductContext()
+      const context = extractProductContext()
       if (!hasProductContext(context)) {
+        this.ready = false
         this.showState('empty', 'No product found', 'I couldn’t find enough visible product information on this page.')
         return
       }
-      if (!supportsNano()) {
-        this.showUnsupported(context)
-        return
+
+      // Opportunistic Tier 1: only initialize Gemini Nano when already downloaded
+      // ('available'). Never trigger a 1.5 GB background download on shoppers.
+      this.destroyBaseSession()
+      if (!this.nanoStubDetected && await isNanoReadyImmediately()) {
+        try {
+          this.initAbort = new AbortController()
+          const session = await createSession(() => undefined, this.initAbort.signal)
+          if (this.disposed) {
+            session.destroy()
+            return
+          }
+          this.session = session
+        } catch {
+          this.destroyBaseSession()
+        }
       }
-      this.showDownload(0, true)
-      this.initAbort = new AbortController()
-      const session = await createSession((percent) => {
-        if (!this.disposed) this.showDownload(percent, false)
-      }, this.initAbort.signal)
-      if (this.disposed) {
-        session.destroy()
-        return
-      }
-      this.session = session
+
+      this.currentRuntime = this.session
+        ? 'nano'
+        : getAssistantMode() === 'local-only'
+          ? 'offline'
+          : 'hybrid'
       this.sessionProductKey = this.productKey(context)
       this.sessionTurns = 0
+      this.ready = true
       this.showReady(context)
     } catch (error) {
       if (this.disposed) return
-      if (error instanceof DOMException && error.name === 'NotAllowedError') {
-        this.showState('error', 'Activation required', 'Close and reopen the assistant, then start the local model again.', true)
-      } else if (error instanceof DOMException && error.name === 'NotSupportedError') {
-        this.showUnsupported(context, true)
-      } else {
-        console.error('[PDP Assistant]', error)
-        this.showState('error', 'Unexpected error', 'The assistant could not start. Please try again.', true)
-      }
+      console.error('[PDP Assistant]', error)
+      this.showState('error', 'Unexpected error', 'The assistant could not start. Please try again.', true)
     } finally {
       this.initAbort = undefined
       this.initializing = false
@@ -305,99 +361,150 @@ export class AssistantWidget {
   }
 
   private async ask(question: string): Promise<void> {
-    if (this.disposed || !question || this.busy || (!this.session && !supportsNano())) return
+    if (this.disposed || !question || this.busy) return
     const input = this.q<HTMLInputElement>('input')
     this.busy = true
     this.q<HTMLButtonElement>('.pdp-send').disabled = true
+
     const context = extractProductContext()
     if (!hasProductContext(context)) {
       this.busy = false
       this.updateSendState()
       return
     }
-    const productKey = this.productKey(context)
-    const productChanged = productKey !== this.sessionProductKey
-    const needsFreshSession = !this.session || productChanged
-    const freshSessionPromise = needsFreshSession
-      ? createSession((percent) => {
-          if (!this.disposed && productChanged) this.showDownload(percent, false)
-        })
-      : undefined
-    const needsLanguageBridge = (isTurkishText(question) || this.contextNeedsTurkish(context)) && !this.languageBridge
-    const bridgePromise = needsLanguageBridge
-      ? createTurkishBridge(() => undefined)
-      : undefined
 
-    if (productChanged) this.showDownload(0, true)
-    try {
-      const [freshSession, freshBridge] = await Promise.all([freshSessionPromise, bridgePromise])
-      if (freshSession) {
-        this.destroyBaseSession()
-        this.session = freshSession
-        this.sessionProductKey = productKey
-        this.sessionTurns = 0
-        if (productChanged) this.showReady(context)
-      }
-      if (freshBridge) this.languageBridge = freshBridge
-    } catch (error) {
-      if (productChanged) this.showReady(context)
-      if (error instanceof DOMException && error.name === 'NotSupportedError' && needsLanguageBridge) {
-        this.appendMessage(TURKISH_TRANSLATION_UNAVAILABLE, 'assistant')
-      } else {
-        this.appendMessage('The local AI resources could not be prepared. Please try again.', 'assistant')
-      }
-      this.busy = false
-      this.updateSendState()
-      return
+    const productKey = this.productKey(context)
+    if (productKey !== this.sessionProductKey) {
+      this.sessionProductKey = productKey
+      this.showReady(context, false)
     }
+
+    const prepared = prepareQuestionEvidence(context, question)
+    const isTurkish = prepared.isTurkish || this.contextNeedsTurkish(context)
 
     input.value = ''
     this.q('.pdp-body').setAttribute('aria-busy', 'true')
     this.appendMessage(question, 'user')
+
     const thinking = document.createElement('div')
     thinking.className = 'pdp-message pdp-assistant pdp-thinking'
     thinking.setAttribute('role', 'status')
-    thinking.innerHTML = '<span class="pdp-loading-label">Thinking</span><i></i><i></i><i></i>'
+    thinking.innerHTML = `<span class="pdp-loading-label">${isTurkish ? 'Yanıtlanıyor' : 'Thinking'}</span><i></i><i></i><i></i>`
     this.q('.pdp-messages').append(thinking)
     this.scroll()
     this.abort = new AbortController()
+
     try {
-      const bridge = (isTurkishText(question) || this.contextNeedsTurkish(context)) ? this.languageBridge : undefined
-      const translateOutput = isTurkishText(question)
-      let answer: string
-      try {
-        answer = await this.runTurnPrompt(context, question, bridge, translateOutput, this.abort.signal)
-      } catch (firstError) {
-        if (firstError instanceof DOMException && firstError.name === 'QuotaExceededError') {
+      // Short-circuit locally when no page evidence matches (0 ms, 0 network calls)
+      if (!prepared.relevantEvidence.length) {
+        thinking.remove()
+        const gateMeta = isTurkish
+          ? 'Yerel NOT_FOUND Koruması · 0 B gönderildi'
+          : 'Local NOT_FOUND Gate · 0 B sent'
+        this.appendMessage(prepared.notFoundText, 'assistant', gateMeta)
+        return
+      }
+
+      let answerText: string | undefined
+      let answerMeta = ''
+
+      // Tier 1: Opportunistic On-Device Gemini Nano (when already available locally)
+      if (this.session && !this.nanoStubDetected) {
+        try {
+          let bridge = this.languageBridge
+          if (isTurkish && !bridge) {
+            bridge = await createTurkishBridge(() => undefined, this.abort.signal)
+            this.languageBridge = bridge
+          }
+          try {
+            answerText = await this.runTurnPrompt(
+              context,
+              question,
+              isTurkish ? bridge : undefined,
+              prepared.isTurkish,
+              this.abort.signal,
+            )
+          } catch (firstErr) {
+            if (firstErr instanceof DOMException && firstErr.name === 'QuotaExceededError') {
+              this.destroyBaseSession()
+              this.session = await createSession()
+              answerText = await this.runTurnPrompt(
+                context,
+                question,
+                isTurkish ? bridge : undefined,
+                prepared.isTurkish,
+                this.abort.signal,
+                2,
+              )
+            } else {
+              throw firstErr
+            }
+          }
+          answerMeta = isTurkish
+            ? 'Cihaz İçi Gemini Nano · 0 B gönderildi'
+            : 'On-Device Nano · 0 B sent'
+        } catch (nanoErr) {
+          if ((nanoErr as DOMException)?.name === 'AbortError') throw nanoErr
+          if (nanoErr instanceof DOMException && (nanoErr.name === 'NotSupportedError' || nanoErr.name === 'QuotaExceededError')) {
+            this.nanoStubDetected = true
+          }
           this.destroyBaseSession()
-          this.session = await createSession()
-          answer = await this.runTurnPrompt(context, question, bridge, translateOutput, this.abort.signal, 2)
-        } else {
-          throw firstError
+          this.currentRuntime = getAssistantMode() === 'local-only' ? 'offline' : 'hybrid'
+          this.updateRuntimeBadge(context)
         }
       }
+
+      // Tier 2: Minimized-Evidence Cloud LLM Fallback (only matched evidence lines)
+      if (!answerText && getAssistantMode() !== 'local-only') {
+        try {
+          const cloud = await requestCloudAnswer({
+            endpoint: resolveApiEndpoint(this.scriptOrigin),
+            question: prepared.cleanQuestion,
+            productTitle: context.title || 'Unknown product',
+            detectedIntent: prepared.detectedIntent,
+            language: prepared.isTurkish ? 'tr' : 'en',
+            evidence: prepared.evidenceLines,
+            signal: this.abort.signal,
+          })
+          answerText = cloud.answer
+          answerMeta = prepared.isTurkish
+            ? `Minimal Bulut LLM (${cloud.provider}) · ${cloud.evidenceCount} kanıt (~${cloud.payloadBytes} B)`
+            : `Minimized Cloud (${cloud.provider}) · ${cloud.evidenceCount} facts (~${cloud.payloadBytes} B)`
+        } catch (cloudErr) {
+          if ((cloudErr as DOMException)?.name === 'AbortError') throw cloudErr
+        }
+      }
+
+      // Tier 3: Generic Offline Extractive Fallback
+      if (!answerText) {
+        answerText = buildLocalExtractiveAnswer(
+          prepared.detectedIntent,
+          context,
+          prepared.relevantEvidence,
+          prepared.isTurkish,
+        )
+        answerMeta = prepared.isTurkish
+          ? 'Yerel Özet Modu · 0 B gönderildi'
+          : 'Offline Local Mode · 0 B sent'
+      }
+
       thinking.remove()
-      this.appendMessage(answer, 'assistant')
+      this.appendMessage(answerText, 'assistant', answerMeta)
     } catch (error) {
       thinking.remove()
       if ((error as DOMException).name !== 'AbortError') {
-        if (!(error instanceof DOMException) || !['NotSupportedError', 'QuotaExceededError'].includes(error.name)) {
-          console.error('[PDP Assistant] Answer failed:', error)
-        }
-        if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-          this.destroyBaseSession()
-        }
-        if (error instanceof DOMException && error.name === 'NotSupportedError' && error.message === LOCAL_AI_UNAVAILABLE_MESSAGE) {
-          this.destroyBaseSession()
-          this.showUnsupported(context)
-          return
-        }
-        const message = error instanceof DOMException && error.name === 'NotSupportedError'
-          ? (isTurkishText(question) ? TURKISH_TRANSLATION_UNAVAILABLE : 'This language or input is not supported by the local model.')
-          : error instanceof DOMException && error.name === 'QuotaExceededError'
-            ? 'The local conversation limit was reached. Send the question again to start a fresh session.'
-            : 'An unexpected error occurred while generating the answer. Please try again.'
-        this.appendMessage(message, 'assistant')
+        console.error('[PDP Assistant] Answer failed:', error)
+        const fallback = buildLocalExtractiveAnswer(
+          prepared.detectedIntent,
+          context,
+          prepared.relevantEvidence,
+          prepared.isTurkish,
+        )
+        this.appendMessage(
+          fallback,
+          'assistant',
+          prepared.isTurkish ? 'Yerel Özet Modu · 0 B' : 'Offline Local Mode · 0 B',
+        )
       }
     } finally {
       this.busy = false
@@ -409,10 +516,47 @@ export class AssistantWidget {
     }
   }
 
-  private showReady(context: ProductContext): void {
-    const title = context.title || 'This product'
+  private runtimeBadgeText(isTurkish: boolean): { text: string; className: string; headerSub: string } {
+    if (this.currentRuntime === 'nano') {
+      return {
+        text: isTurkish ? 'Cihaz İçi Gemini Nano · 0 B ağ' : 'On-Device Nano · Zero network',
+        className: '',
+        headerSub: isTurkish ? 'Cihaz içi AI hazır' : 'On-device intelligence ready',
+      }
+    }
+    if (this.currentRuntime === 'offline') {
+      return {
+        text: isTurkish ? 'Yerel Özet Modu · 0 B ağ' : 'Offline Local Mode · Zero network',
+        className: 'pdp-badge-offline',
+        headerSub: isTurkish ? 'Sadece cihaz içi yerel mod' : 'Local-only offline mode',
+      }
+    }
+    return {
+      text: isTurkish ? 'Yerel Çıkarım + Minimal Bulut AI' : 'Local Retrieval + Minimized Cloud',
+      className: 'pdp-badge-hybrid',
+      headerSub: isTurkish ? 'Sıfır indirme · Hibrit ürün asistanı' : 'Zero-download · Hybrid product AI',
+    }
+  }
+
+  private updateRuntimeBadge(context: ProductContext): void {
+    const isTurkish = this.contextNeedsTurkish(context)
+    const info = this.runtimeBadgeText(isTurkish)
+    const badge = this.root.querySelector<HTMLElement>('.pdp-runtime-badge')
+    if (badge) {
+      badge.textContent = info.text
+      badge.className = `pdp-runtime-badge ${info.className}`.trim()
+    }
+    const headerSub = this.root.querySelector<HTMLElement>('.pdp-header-sub')
+    if (headerSub) {
+      headerSub.innerHTML = `<i class="pdp-dot"></i> ${this.escape(info.headerSub)}`
+    }
+  }
+
+  private showReady(context: ProductContext, focusInput = true): void {
+    const isTurkish = this.contextNeedsTurkish(context)
+    const title = context.title || (isTurkish ? 'Ürün' : 'This product')
     const rating = context.rating
-      ? `${context.rating} / 5${context.reviewCount ? ` · ${context.reviewCount} reviews` : ''}`
+      ? `${context.rating} / 5${context.reviewCount ? ` · ${context.reviewCount} ${isTurkish ? 'yorum' : 'reviews'}` : ''}`
       : ''
     const facts = [
       context.listedPrice ? `<span class="pdp-listed-price">${this.escape(context.listedPrice)}</span>` : '',
@@ -424,7 +568,13 @@ export class AssistantWidget {
     const keyFactsMarkup = keyFacts.length
       ? `<div class="pdp-key-facts">${keyFacts.map((value) => `<span>${this.escape(value)}</span>`).join('')}</div>`
       : ''
-    this.q('.pdp-body').innerHTML = `<div class="pdp-product-summary"><div class="pdp-product-media" aria-hidden="true"></div><div class="pdp-product-content"><strong>${this.escape(title)}</strong>${brand}<div class="pdp-product-facts">${facts}</div>${keyFactsMarkup}<small>Local Gemini Nano · Page-grounded</small></div></div><div class="pdp-messages"></div>`
+    const runtime = this.runtimeBadgeText(isTurkish)
+    this.q('.pdp-body').innerHTML = `<div class="pdp-product-summary"><div class="pdp-product-media" aria-hidden="true"></div><div class="pdp-product-content"><strong>${this.escape(title)}</strong>${brand}<div class="pdp-product-facts">${facts}</div>${keyFactsMarkup}<small class="pdp-runtime-badge ${runtime.className}">${this.escape(runtime.text)}</small></div></div><div class="pdp-messages"></div>`
+    const headerSub = this.root.querySelector<HTMLElement>('.pdp-header-sub')
+    if (headerSub) {
+      headerSub.innerHTML = `<i class="pdp-dot"></i> ${this.escape(runtime.headerSub)}`
+    }
+
     const media = this.q('.pdp-product-media')
     const imageUrl = context.image || context.images?.[0]
     if (imageUrl) {
@@ -437,6 +587,7 @@ export class AssistantWidget {
     } else {
       media.textContent = title.charAt(0).toLocaleUpperCase()
     }
+
     this.suggestedQuestions = getSuggestedQuestions(context)
     const suggestions = this.q('.pdp-suggestions')
     suggestions.replaceChildren(...this.suggestedQuestions.map((question) => {
@@ -447,71 +598,37 @@ export class AssistantWidget {
       button.textContent = question
       return button
     }))
+
+    const input = this.q<HTMLInputElement>('input')
+    input.placeholder = isTurkish ? 'Bu ürün hakkında soru sorun…' : 'Ask about this product…'
+    this.q('.pdp-privacy').textContent = isTurkish
+      ? 'Yerel ayrıştırma · Buluta yalnızca eşleşen kısa kanıtlar gider'
+      : 'Local retrieval · Only matched evidence leaves device when cloud needed'
+
     this.q('.pdp-composer').classList.remove('pdp-hidden')
-    this.q<HTMLInputElement>('input').focus()
-  }
-
-  private showUnsupported(context: ProductContext, retry = false): void {
-    this.q('.pdp-composer').classList.add('pdp-hidden')
-    const sourceBadge = context.dataSource?.some((item) => item.includes('json-ld'))
-      ? 'json-ld'
-      : 'dom'
-    const price = context.basketPrice || context.listedPrice || ''
-    const rating = context.rating
-      ? `★ ${context.rating} / 5${context.reviewCount ? ` (${context.reviewCount})` : ''}`
-      : ''
-    const specs = Object.entries(context.specs).slice(0, 4)
-    const specsMarkup = specs.length
-      ? `<ul class="pdp-preview-specs">${specs.map(([key, value]) => `<li><span>${this.escape(key)}</span><strong>${this.escape(value)}</strong></li>`).join('')}</ul>`
-      : ''
-    const hasInspector = Boolean(document.getElementById('pipeline-inspector'))
-    const inspectorCta = hasInspector
-      ? '<button type="button" class="pdp-preview-cta">Open Pipeline Inspector ↓</button>'
-      : ''
-
-    this.q('.pdp-body').innerHTML = `
-      <div class="pdp-state pdp-state-compact">
-        <div class="pdp-state-icon">!</div>
-        <strong>${retry ? 'Local AI unavailable' : 'Unsupported browser'}</strong>
-        <p>${this.escape(LOCAL_AI_UNAVAILABLE_MESSAGE)}</p>
-        ${retry ? '<button class="pdp-retry">Try again</button>' : ''}
-      </div>
-      <div class="pdp-preview-card">
-        <div class="pdp-preview-head">
-          <span>Local Extraction Preview</span>
-          <span class="pdp-preview-badge">${this.escape(sourceBadge)}</span>
-        </div>
-        <div class="pdp-preview-title">${this.escape(context.title || 'Detected Product')}</div>
-        ${(price || rating) ? `<div class="pdp-preview-meta">${price ? `<span class="pdp-preview-price">${this.escape(price)}</span>` : ''}${rating ? `<span>${this.escape(rating)}</span>` : ''}</div>` : ''}
-        ${specsMarkup}
-        ${inspectorCta}
-      </div>`
-
-    this.root.querySelector('.pdp-retry')?.addEventListener('click', () => void this.initialize())
-    this.root.querySelector('.pdp-preview-cta')?.addEventListener('click', () => {
-      this.closePanel()
-      const inspector = document.getElementById('pipeline-inspector')
-      inspector?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      document.getElementById('inspector-question')?.focus({ preventScroll: true })
-    })
-  }
-
-  private showDownload(percent: number, waitingToStart: boolean): void {
-    this.q('.pdp-composer').classList.add('pdp-hidden')
-    this.q('.pdp-body').innerHTML = `<div class="pdp-state" role="status"><div class="pdp-state-icon">↓</div><strong>${waitingToStart ? 'Local AI download required' : 'Local AI download in progress'}</strong><p>Chrome is preparing Gemini Nano on this device. Keep this page open.</p><div class="pdp-progress"><span style="width:${percent}%"></span></div><p>${percent ? `${percent}%` : 'Starting…'}</p></div>`
+    if (focusInput) input.focus()
   }
 
   private showState(kind: string, title: string, message: string, retry = false): void {
     const symbols: Record<string, string> = { empty: '⌕', unsupported: '!', loading: '···', error: '↻' }
     this.q('.pdp-composer').classList.add('pdp-hidden')
-    this.q('.pdp-body').innerHTML = `<div class="pdp-state"><div class="pdp-state-icon">${symbols[kind] ?? '!'}</div><strong>${title}</strong><p>${message}</p>${retry ? '<button class="pdp-retry">Try again</button>' : ''}</div>`
+    this.q('.pdp-body').innerHTML = `<div class="pdp-state"><div class="pdp-state-icon">${symbols[kind] ?? '!'}</div><strong>${this.escape(title)}</strong><p>${this.escape(message)}</p>${retry ? '<button class="pdp-retry">Try again</button>' : ''}</div>`
     this.root.querySelector('.pdp-retry')?.addEventListener('click', () => void this.initialize())
   }
 
-  private appendMessage(text: string, type: 'user' | 'assistant'): void {
+  private appendMessage(text: string, type: 'user' | 'assistant', meta?: string): void {
     const message = document.createElement('div')
     message.className = `pdp-message pdp-${type}`
-    message.textContent = text
+    if (type === 'assistant' && meta) {
+      const body = document.createElement('div')
+      body.textContent = text
+      const metaEl = document.createElement('div')
+      metaEl.className = 'pdp-answer-meta'
+      metaEl.textContent = meta
+      message.append(body, metaEl)
+    } else {
+      message.textContent = text
+    }
     this.q('.pdp-messages').append(message)
     this.scroll()
   }

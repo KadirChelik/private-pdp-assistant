@@ -2,12 +2,16 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { JSDOM } from 'jsdom'
 
+import { __resetRateLimitsForTests, handleAskRequest } from '../api/ask.ts'
 import { getSuggestedQuestions, parseSpecsFromDescription } from '../src/extractor.ts'
+import { buildLocalExtractiveAnswer } from '../src/fallback.ts'
 import {
   answerQuestion,
   createSession,
   detectQuestionIntent,
+  isNanoReadyImmediately,
   isTurkishText,
+  prepareQuestionEvidence,
   retrieveEvidence,
 } from '../src/nano.ts'
 import { createTurkishBridge } from '../src/translation.ts'
@@ -662,4 +666,229 @@ test('non-preset EN and TR paraphrases retrieve exact evidence and reject absent
   } finally {
     restore()
   }
+})
+
+test('isNanoReadyImmediately returns true only when availability is already available', async () => {
+  const previousWindow = (globalThis as { window?: unknown }).window
+  try {
+    ;(globalThis as { window: unknown }).window = {
+      localStorage: { getItem: () => null },
+      LanguageModel: {
+        availability: async () => 'downloadable',
+        create: async () => { throw new Error('Should not trigger download') },
+      },
+    }
+    assert.equal(await isNanoReadyImmediately(), false)
+
+    ;(globalThis as { window: unknown }).window = {
+      localStorage: { getItem: () => null },
+      LanguageModel: {
+        availability: async () => 'available',
+        create: async () => ({ prompt: async () => '', destroy: () => undefined }),
+      },
+    }
+    assert.equal(await isNanoReadyImmediately(), true)
+  } finally {
+    if (previousWindow === undefined) delete (globalThis as { window?: unknown }).window
+    else (globalThis as { window: unknown }).window = previousWindow
+  }
+})
+
+test('buildLocalExtractiveAnswer formats TR/EN price, reviews, specs, and summaries cleanly', () => {
+  const trContext: ProductContext = {
+    url: 'https://shop.test/shoe',
+    title: 'AeroStride Pro Koşu Ayakkabısı',
+    listedPrice: '3.499 TL',
+    basketPrice: '2.999 TL',
+    rating: '4.6',
+    reviewCount: 3,
+    specs: { Kalıp: 'Tam kalıp', Ağırlık: '245 g', Taban: 'EVA + Kauçuk' },
+  }
+  const priceAnswer = buildLocalExtractiveAnswer(
+    'price',
+    trContext,
+    [{ id: 'p1', type: 'basketPrice', label: 'Basket price', value: '2.999 TL', source: 'dom', searchableText: '2.999 TL' }],
+    true,
+  )
+  assert.match(priceAnswer, /3\.499 TL/)
+  assert.match(priceAnswer, /2\.999 TL/)
+
+  const reviewAnswer = buildLocalExtractiveAnswer(
+    'reviews',
+    trContext,
+    [{ id: 'r1', type: 'review', label: 'Customer review', value: 'Çok hafif ve rahat.', source: 'review', searchableText: 'Çok hafif' }],
+    true,
+  )
+  assert.match(reviewAnswer, /4\.6 \/ 5/)
+  assert.match(reviewAnswer, /Çok hafif ve rahat\./)
+
+  const summaryAnswer = buildLocalExtractiveAnswer(
+    'summary',
+    {
+      url: 'https://shop.test/pack',
+      title: 'Terra Trail Pack 28L',
+      listedPrice: '129.00 USD',
+      specs: { Capacity: '28 litres', Weight: '980 g' },
+    },
+    [{ id: 't1', type: 'title', label: 'Product title', value: 'Terra Trail Pack 28L', source: 'page', searchableText: 'Terra Trail Pack' }],
+    false,
+  )
+  assert.match(summaryAnswer, /Terra Trail Pack 28L/)
+  assert.match(summaryAnswer, /Price: 129\.00 USD/)
+})
+
+test('footwear and apparel Turkish paraphrases retrieve exact specs/reviews and reject absent colors', async () => {
+  const restoreShoe = installDom(`<!doctype html><html lang="tr"><head>
+    <script type="application/ld+json">{
+      "@type": "Product",
+      "name": "AeroStride Pro Koşu Ayakkabısı",
+      "offers": { "@type": "Offer", "price": "3499", "priceCurrency": "TRY", "availability": "https://schema.org/InStock" },
+      "aggregateRating": { "@type": "AggregateRating", "ratingValue": "4.6", "reviewCount": "2" },
+      "review": [
+        { "@type": "Review", "reviewRating": { "@type": "Rating", "ratingValue": "4" }, "reviewBody": "Geniş taraklı ayaklarda yarım numara büyük tercih edilebilir." }
+      ]
+    }</script>
+  </head><body><main class="product-detail">
+    <h1>AeroStride Pro Koşu Ayakkabısı</h1>
+    <div class="discount-price">Sepette 2.999 TL</div>
+    <ul class="specs"><li><span>Kalıp</span><strong>Tam kalıp</strong></li><li><span>Taban</span><strong>EVA + Kauçuk</strong></li></ul>
+  </main></body></html>`)
+
+  try {
+    const { extractProductContext } = await import('../src/extractor.ts')
+    const shoeCtx = extractProductContext()
+    const fitPrepared = prepareQuestionEvidence(shoeCtx, 'Kalıbı nasıl, taraklı ayağa olur mu?')
+    assert.ok(fitPrepared.relevantEvidence.some((item) => item.value.includes('Tam kalıp')))
+    assert.ok(fitPrepared.relevantEvidence.some((item) => item.value.includes('taraklı')))
+    assert.deepEqual(prepareQuestionEvidence(shoeCtx, 'Kırmızı rengi var mı?').relevantEvidence, [])
+  } finally {
+    restoreShoe()
+  }
+
+  const restoreDress = installDom(`<!doctype html><html lang="tr"><body><main class="product-detail">
+    <h1>Solis %100 Keten Midi Elbise</h1>
+    <div class="price" itemprop="price">2.190 TL</div>
+    <ul class="specs">
+      <li><span>Kumaş</span><strong>%100 Doğal Keten</strong></li>
+      <li><span>Astar</span><strong>Pamuklu iç astar</strong></li>
+      <li><span>Yıkama</span><strong>30°C hassas yıkama</strong></li>
+      <li><span>Renk</span><strong>Bej</strong></li>
+    </ul>
+  </main></body></html>`)
+
+  try {
+    const { extractProductContext } = await import('../src/extractor.ts')
+    const dressCtx = extractProductContext()
+    const summerPrepared = prepareQuestionEvidence(dressCtx, 'Yazın terletir mi, kumaşı ne?')
+    assert.ok(summerPrepared.relevantEvidence.some((item) => item.value.includes('Doğal Keten')))
+    const washPrepared = prepareQuestionEvidence(dressCtx, 'Yıkama talimatı nedir?')
+    assert.ok(washPrepared.relevantEvidence.some((item) => item.value.includes('30°C hassas yıkama')))
+  } finally {
+    restoreDress()
+  }
+})
+
+test('api/ask handleAskRequest validates schema, blocks HTML, enforces rate limit, and returns grounded answer', async () => {
+  __resetRateLimitsForTests()
+
+  const getRes = await handleAskRequest(new Request('https://example.test/api/ask', { method: 'GET' }))
+  assert.equal(getRes.status, 405)
+
+  const htmlRes = await handleAskRequest(
+    new Request('https://example.test/api/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        question: 'What is the price?',
+        productTitle: 'Pack',
+        detectedIntent: 'price',
+        language: 'en',
+        evidence: ['<div>$129</div>'],
+      }),
+    }),
+    { clientIp: '198.51.100.1' },
+  )
+  assert.equal(htmlRes.status, 400)
+
+  const noKeysRes = await handleAskRequest(
+    new Request('https://example.test/api/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        question: 'What is the price?',
+        productTitle: 'Pack',
+        detectedIntent: 'price',
+        language: 'en',
+        evidence: ['Listed price: 129.00 USD'],
+      }),
+    }),
+    { clientIp: '198.51.100.2', env: {} },
+  )
+  assert.equal(noKeysRes.status, 503)
+
+  const okRes = await handleAskRequest(
+    new Request('https://example.test/api/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        question: 'Fiyatı nedir?',
+        productTitle: 'AeroStride',
+        detectedIntent: 'price',
+        language: 'tr',
+        evidence: ['Listed price: 3.499 TL', 'Basket price: 2.999 TL'],
+      }),
+    }),
+    {
+      clientIp: '198.51.100.3',
+      env: { GEMINI_API_KEY: 'test-key' },
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({
+            candidates: [
+              { content: { parts: [{ text: 'Liste fiyatı 3.499 TL, sepette 2.999 TL.' }] } },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    },
+  )
+  assert.equal(okRes.status, 200)
+  const json = (await okRes.json()) as { answer: string; provider: string; evidenceCount: number }
+  assert.equal(json.provider, 'gemini')
+  assert.equal(json.evidenceCount, 2)
+  assert.match(json.answer, /2\.999 TL/)
+
+  __resetRateLimitsForTests()
+  for (let i = 0; i < 15; i += 1) {
+    const r = await handleAskRequest(
+      new Request('https://example.test/api/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: 'Price?',
+          productTitle: 'Pack',
+          detectedIntent: 'price',
+          language: 'en',
+          evidence: ['Listed price: 129.00 USD'],
+        }),
+      }),
+      { clientIp: '198.51.100.99', env: {} },
+    )
+    assert.equal(r.status, 503)
+  }
+  const limited = await handleAskRequest(
+    new Request('https://example.test/api/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        question: 'Price?',
+        productTitle: 'Pack',
+        detectedIntent: 'price',
+        language: 'en',
+        evidence: ['Listed price: 129.00 USD'],
+      }),
+    }),
+    { clientIp: '198.51.100.99', env: {} },
+  )
+  assert.equal(limited.status, 429)
 })

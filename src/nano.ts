@@ -95,6 +95,16 @@ async function getAvailabilitySafely(): Promise<{
   }
 }
 
+export async function isNanoReadyImmediately(): Promise<boolean> {
+  if (!supportsNano()) return false
+  try {
+    const { availability } = await getAvailabilitySafely()
+    return availability === 'available'
+  } catch {
+    return false
+  }
+}
+
 export async function getNanoStatus(): Promise<NanoStatus> {
   if (!supportsNano()) {
     return {
@@ -176,12 +186,12 @@ function normalize(value: string): string {
 }
 
 export function isTurkishText(question: string): boolean {
-  return /[çğıöşü]|\b(?:bu|ürün|nedir|kaç|yorum|fiyat|rengi|ölçü|bazalı|hakkında|kurulum|montaj|monte|zor|kolay|parça|ayak|paket|içinden|malzeme|ahşap|yatak)\b/i.test(
+  return /[çğıöşü]|\b(?:bu|ürün|urun|nedir|kaç|kac|yorum|fiyat|fiyati|rengi|renk|ölçü|olcu|bazalı|hakkında|kurulum|montaj|monte|zor|kolay|parça|ayak|paket|içinden|malzeme|ahşap|yatak|kalip|kalibi|tarakli|ayakkabi|numara|taban|keten|elbise|yikama|yikanir|astar|terletir|kumas|beden|yazlik|yazin|stok|kargo|garanti|marka|nasil)\b/i.test(
     question,
   )
 }
 
-function sameLanguageNotFound(question: string): string {
+export function sameLanguageNotFound(question: string): string {
   return isTurkishText(question)
     ? 'Bu bilgiyi ürün sayfasında net olarak bulamadım.'
     : NOT_FOUND_ANSWER
@@ -358,6 +368,9 @@ function isMaterialContext(value: string): boolean {
     /\bsteel\b/,
     /\baluminum\b/,
     /\bplastic\b/,
+    /\bketen/,
+    /\bpamuk/,
+    /\blinen\b/,
   ])
 }
 
@@ -453,9 +466,20 @@ function isSuitabilityContext(value: string): boolean {
     /\boturma odasi\b/,
     /\buygun mu\b/,
     /\buygun olur\b/,
+    /\bolur mu\b/,
+    /\bayaga\b/,
+    /\bayagin/,
+    /\byazin\b/,
+    /\byazlik\b/,
+    /\bterletir/,
+    /\bdugun/,
+    /\bkosu\b/,
     /\bliving room\b/,
     /\bsuitable\b/,
     /\bfit in\b/,
+    /\bsummer\b/,
+    /\brunning\b/,
+    /\bwedding\b/,
   ])
 }
 
@@ -1079,6 +1103,22 @@ function expandedQuestionTerms(question: string, intent: QuestionIntent): string
     ;['return', 'returns', 'return window', 'refund', 'iade'].forEach((term) => terms.add(term))
   }
 
+  if (/kalip|fit|beden|numara|size|tarakli|genis|wide/.test(value)) {
+    ;['kalip', 'fit', 'numara', 'beden', 'size', 'genis', 'tarakli', 'review'].forEach((term) => terms.add(term))
+  }
+
+  if (/taban|sole|yastiklama|cushion|drop/.test(value)) {
+    ;['taban', 'sole', 'eva', 'kaucuk', 'drop', 'yastiklama'].forEach((term) => terms.add(term))
+  }
+
+  if (/terlet|nefes|breathab|yaz|summer|serin|keten|pamuk|linen|astar|lining/.test(value)) {
+    ;['keten', 'linen', 'pamuk', 'pamuklu', 'astar', 'nefes', 'breathable', 'terlet', 'kumas'].forEach((term) => terms.add(term))
+  }
+
+  if (/yika|wash|utu|iron|temizl|care/.test(value)) {
+    ;['yikama', 'wash', 'hassas', 'bakim', 'care'].forEach((term) => terms.add(term))
+  }
+
   return Array.from(terms)
 }
 
@@ -1571,17 +1611,33 @@ function naturalAnswerOnly(value: string): string {
 
 const CHROMIUM_ECHO_STUB_PREFIX = /^On-device model is not available in Chromium/i
 
-export async function answerQuestion(
-  session: LanguageModelSession,
+export interface PreparedEvidence {
+  cleanQuestion: string
+  detectedIntent: QuestionIntent
+  relevantEvidence: EvidenceItem[]
+  evidenceLines: string[]
+  isTurkish: boolean
+  notFoundText: string
+}
+
+export function prepareQuestionEvidence(
   productContext: ProductContext,
   question: string,
-  signal?: AbortSignal,
-  languageBridge?: AnswerLanguageBridge,
-  translateOutput = Boolean(languageBridge),
   maxEvidenceItems?: number,
-): Promise<string> {
+): PreparedEvidence {
   const cleanQuestion = clean(question)
-  if (!cleanQuestion) return NOT_FOUND_ANSWER
+  const isTurkish = isTurkishText(cleanQuestion)
+  const notFoundText = sameLanguageNotFound(cleanQuestion)
+  if (!cleanQuestion) {
+    return {
+      cleanQuestion: '',
+      detectedIntent: 'unknown',
+      relevantEvidence: [],
+      evidenceLines: [],
+      isTurkish,
+      notFoundText,
+    }
+  }
 
   const detectedIntent = detectQuestionIntent(cleanQuestion)
   const evidenceIndex = buildEvidenceIndex(productContext)
@@ -1595,10 +1651,39 @@ export async function answerQuestion(
   const relevantEvidence = capEvidenceChars(
     refineEvidence(cleanQuestion, rawCandidates).slice(0, itemLimit),
   )
+  const evidenceLines = relevantEvidence.map((item) => {
+    const label = item.label ? `${item.label}: ` : ''
+    return `${label}${item.value}`
+  })
 
-  if (!relevantEvidence.length) {
-    return sameLanguageNotFound(cleanQuestion)
+  return {
+    cleanQuestion,
+    detectedIntent,
+    relevantEvidence,
+    evidenceLines,
+    isTurkish,
+    notFoundText,
   }
+}
+
+export async function answerQuestion(
+  session: LanguageModelSession,
+  productContext: ProductContext,
+  question: string,
+  signal?: AbortSignal,
+  languageBridge?: AnswerLanguageBridge,
+  translateOutput = Boolean(languageBridge),
+  maxEvidenceItems?: number,
+): Promise<string> {
+  const {
+    cleanQuestion,
+    detectedIntent,
+    relevantEvidence,
+    notFoundText,
+  } = prepareQuestionEvidence(productContext, question, maxEvidenceItems)
+
+  if (!cleanQuestion) return NOT_FOUND_ANSWER
+  if (!relevantEvidence.length) return notFoundText
 
   const rawEvidence = evidenceForPrompt(relevantEvidence)
   const [modelQuestion, modelEvidence, modelTitle] = languageBridge
@@ -1629,12 +1714,12 @@ export async function answerQuestion(
     throw new DOMException(LOCAL_AI_UNAVAILABLE_MESSAGE, 'NotSupportedError')
   }
 
-  if (!modelResult) return sameLanguageNotFound(cleanQuestion)
+  if (!modelResult) return notFoundText
 
   const localizedResult = languageBridge && translateOutput
     ? (await languageBridge.fromModel(modelResult)).trim()
     : modelResult
-  const answer = naturalAnswerOnly(localizedResult) || sameLanguageNotFound(cleanQuestion)
+  const answer = naturalAnswerOnly(localizedResult) || notFoundText
   return answer.length <= MAX_ANSWER_CHARS
     ? answer
     : `${answer.slice(0, MAX_ANSWER_CHARS - 1).trimEnd()}…`

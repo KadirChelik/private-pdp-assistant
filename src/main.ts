@@ -5,6 +5,15 @@ import { buildEvidenceIndex, detectQuestionIntent, retrieveEvidence } from './na
 const ROOT_ID = 'private-pdp-assistant-root'
 let widget: AssistantWidget | undefined
 
+const SCRIPT_ORIGIN = (() => {
+  try {
+    const script = document.currentScript as HTMLScriptElement | null
+    return script?.src ? new URL(script.src, location.href).origin : undefined
+  } catch {
+    return undefined
+  }
+})()
+
 function mount(): void {
   if (document.getElementById(ROOT_ID)) return
 
@@ -17,7 +26,7 @@ function mount(): void {
   root.style.zIndex = '2147483647'
   document.documentElement.append(root)
 
-  widget = new AssistantWidget(root)
+  widget = new AssistantWidget(root, SCRIPT_ORIGIN)
   widget.mount()
 }
 
@@ -27,6 +36,10 @@ function unmount(): void {
 
   const root = document.getElementById(ROOT_ID)
   root?.remove()
+}
+
+function refresh(): void {
+  widget?.refresh()
 }
 
 function debugContext() {
@@ -50,6 +63,7 @@ function debugRetrieveEvidence(question: string) {
 }
 
 window.PDPAssistant ??= { mount, unmount }
+window.PDPAssistant.refresh = refresh
 window.PDPAssistant.debugContext = debugContext
 window.PDPAssistant.debugEvidenceIndex = debugEvidenceIndex
 window.PDPAssistant.debugRetrieveEvidence = debugRetrieveEvidence

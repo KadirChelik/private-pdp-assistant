@@ -1,100 +1,82 @@
 # Private PDP Assistant
 
-A zero-network, dependency-free TypeScript + Vite widget that extracts structured product information directly from any product detail page (PDP) and answers shopper questions inside an isolated **Shadow DOM** panel using Chrome's on-device **Gemini Nano Prompt API** (`window.LanguageModel`). Turkish questions and Turkish storefronts are bridged locally via Chrome's built-in **Translator API** (`window.Translator`).
+A category-agnostic, local-first **3-tier hybrid** e-commerce product assistant widget built with **TypeScript, Shadow DOM, and Vite IIFE** (zero runtime npm dependencies) paired with a minimal-evidence serverless fallback (`api/ask.ts`).
 
-No API keys, no cloud LLM fallback, and **zero** network requests (`fetch`, `XHR`, or `WebSocket`) leave the user's browser.
-
-**Live Demo & Pipeline Inspector:** `https://private-pdp-assistant.vercel.app`
+**Live 3-Category Demo & Inspector:** https://private-pdp-assistant.vercel.app
 
 ---
 
-## Architecture & Data Flow
+## Why 3-Tier Local-First Hybrid?
+
+Forcing shoppers on an e-commerce store to download a ~1.5 GB browser AI model or showing an `"Unsupported browser"` wall kills conversion. Instead, Private PDP Assistant runs **all extraction, intent detection, and evidence retrieval locally in the browser** and selects the fastest available inference path with **zero forced downloads**:
 
 ```text
-Product Page DOM / Schema.org JSON-LD
+Product Page DOM / Schema.org JSON-LD (any category: outdoor, footwear, apparel, electronics...)
         │
-        ▼  extractProductContext() (ignores [data-pdp-assistant] & [data-pdp-assistant-ignore])
-Structured ProductContext (title, price, specs, reviews, Q&A)
+        ▼  extractProductContext() + buildEvidenceIndex() + retrieveEvidence()   [100% local]
         │
-        ▼  buildEvidenceIndex() + detectQuestionIntent() + retrieveEvidence()
-Ranked Top-K Grounded Evidence (or empty -> strict NOT_FOUND fallback)
+        ├── No matching evidence? ──▶ Local NOT_FOUND Gate (0 ms, 0 bytes, $0 API cost)
         │
-        ├──▶ Browser supports window.LanguageModel?
-        │       ├── Yes -> On-device Gemini Nano session (+ optional local TR<->EN Translator bridge)
-        │       └── No  -> Honest local-only notice + Local Extraction Preview inside Shadow DOM
-        │                  (and interactive Pipeline Inspector on the demo storefront)
+        ├── Tier 1: Chrome Gemini Nano already 'available' locally?
+        │       └── Yes ─▶ Isolated On-Device Session (0 B network, $0 API cost)
+        │
+        ├── Tier 2: Any other browser (Safari, Firefox, Mobile, Nano not downloaded)
+        │       └── Minimized-Evidence Cloud (/api/ask: Gemini -> Groq -> OpenRouter)
+        │           Sends ONLY 1-10 matched facts (~150-350 B, zero HTML, zero PII)
+        │
+        └── Tier 3: Offline / local-only mode / cloud unavailable
+                └── Category-Agnostic Local Extractive Synthesizer (0 B network)
 ```
 
 ---
 
-## Run Locally
+## Features
 
-```bash
-npm install
-npm run dev
-```
-
-Open the local URL in desktop Chrome. For live on-device generation, enable:
-- `chrome://flags/#optimization-guide-on-device-model`
-- `chrome://flags/#prompt-api-for-gemini-nano`
-
-Relaunch Chrome and open the floating **Private PDP Assist** button in the bottom-right corner. Turkish chat also downloads Chrome's built-in `window.Translator` language packs on first use and runs offline afterward.
-
-On browsers without Gemini Nano enabled, the widget displays a **Local Extraction Preview** inside the Shadow DOM panel, and the demo page includes an interactive **Live On-Device Pipeline Inspector** so any visitor can trace `ProductContext` extraction, intent detection, and evidence scoring live.
-
-Run the dependency-free test suite (Node native test runner + `jsdom`):
-
-```bash
-npm test
-```
+- **Category-Agnostic Extraction (`src/extractor.ts`):** Prioritizes Schema.org `Product` JSON-LD with controlled fallbacks to meta tags and visible DOM specs, basket discounts (`.discount-price`), ratings, and customer reviews.
+- **Zero-Noise Local Retrieval (`src/nano.ts`):** Detects TR/EN shopping intents (`price`, `capacity`, `material`, `reviews`, `delivery`, `returnPolicy`, `suitability`, `summary`, etc.), scores ranked evidence, prevents false positives on absent attributes, and strips duplicate review/UI noise.
+- **Zero Forced 1.5 GB Downloads (`src/ui.ts`):** Checks `window.LanguageModel.availability()` and uses Gemini Nano *only* when `availability === 'available'`. Every browser (Safari, Firefox, Mobile, Chrome) opens chat immediately.
+- **Minimized-Payload Cloud Fallback (`api/ask.ts`):** Serverless endpoint with strict IP rate limiting (15 req/min), 8 KB body cap, strict PDP-evidence schema validation, HTML payload rejection, and multi-provider fallback (`Gemini -> Groq -> OpenRouter`).
+- **Embeddable Shadow DOM Widget:** Zero external runtime dependencies, encapsulated CSS, focus trap, swipeable suggested questions, and `window.PDPAssistant.refresh()` for SPA storefronts.
 
 ---
 
-## Build & Deploy
+## Configuration & DevTools Injection
 
-```bash
-npm run build
-```
-
-This outputs:
-- `dist/private-pdp-assistant.js` — standalone IIFE widget bundle (`ShadowRoot`-isolated, zero runtime dependencies)
-- `dist/index.html` — demo PDP storefront + interactive Pipeline Inspector loading `/private-pdp-assistant.js`
-
-Deploy `dist/` to Vercel, Netlify, Cloudflare Pages, or any static host. CORS headers for cross-origin DevTools injection are preconfigured in `vercel.json`.
-
-### Inject on any product page via DevTools Console
+Inject on any product detail page from DevTools Console:
 
 ```js
 (()=>{const s=document.createElement('script');s.src='https://private-pdp-assistant.vercel.app/private-pdp-assistant.js';s.crossOrigin='anonymous';document.head.append(s)})()
 ```
 
-Running the snippet more than once is idempotent. To remove or restore the widget:
+Optional runtime configuration before or after loading:
 
 ```js
+window.PDPAssistantConfig = {
+  mode: 'hybrid', // or 'local-only' (disables Tier 2 cloud fallback completely)
+  apiEndpoint: 'https://your-domain.example/api/ask',
+}
+```
+
+Lifecycle & diagnostics API:
+
+```js
+PDPAssistant.refresh()
 PDPAssistant.unmount()
 PDPAssistant.mount()
-```
-
----
-
-## Diagnostics API
-
-On any page where the widget is mounted, inspect extraction and retrieval in DevTools Console:
-
-```js
 PDPAssistant.debugContext()
 PDPAssistant.debugEvidenceIndex()
-PDPAssistant.debugRetrieveEvidence('What is the warranty?')
-PDPAssistant.detectIntent('What do customer reviews say?')
+PDPAssistant.debugRetrieveEvidence('Geniş taraklı ayağa olur mu?')
 ```
-
-`debugContext()` reports `priceSource` and `dataSource` so Schema.org JSON-LD priority vs. meta/DOM fallbacks are easy to verify.
 
 ---
 
-## Privacy & Grounding Guarantees
+## Run Locally & Test
 
-- **Local extraction priority:** Prefers Schema.org JSON-LD `Product` data, falling back cleanly to metadata (`og:` / `itemprop`) and visible DOM attributes/tables/reviews.
-- **On-device inference only:** Prompts are sent exclusively to `window.LanguageModel`; Turkish bridging uses `window.Translator`.
-- **Zero telemetry or remote calls:** Zero runtime npm dependencies, zero analytics, zero `fetch` / `XMLHttpRequest` / `WebSocket` calls.
-- **Strict page grounding:** Each question only sends ranked matching evidence from the fresh page snapshot; when no evidence matches, the model is instructed to return `"I could not find this information on the product page."` rather than guessing.
+```bash
+npm install
+npm test        # Node native test runner + jsdom
+npm run build   # Builds dist/private-pdp-assistant.js + dist/index.html
+npm run dev     # Local Vite dev server
+```
+
+To run Tier 2 Cloud Fallback locally, deploy on Vercel (`vercel dev` or production) with `GEMINI_API_KEY`, `GROQ_API_KEY`, and/or `OPENROUTER_API_KEY`. Without any API keys configured, `/api/ask` returns `503` and the widget automatically falls back to Tier 3 (`Offline Local Mode`).

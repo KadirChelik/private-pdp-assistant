@@ -3,21 +3,28 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="description" content="Demo product detail page and live pipeline inspector for Private PDP Assistant — a zero-network, on-device AI widget powered by Chrome Gemini Nano." />
+    <meta name="description" content="3-category live demo storefront and Pipeline Inspector for Private PDP Assistant — a local-first 3-tier hybrid e-commerce AI widget." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>Terra Trail Pack 28L — Private PDP Assistant Demo</title>
+    <title>Private PDP Assistant — 3-Category Hybrid E-Commerce Demo</title>
     <style>
       :root{--bg:#f5f2ea;--surface:#fffdf9;--ink:#183126;--muted:#53645b;--line:#d5ddd7;--brand:#173f2b;--accent:#257246}
       *{box-sizing:border-box}
       body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Inter,system-ui,-apple-system,sans-serif}
-      nav{padding:18px 6vw;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #d8ded8;background:#f8f6ef}
+      nav{padding:14px 6vw;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px;border-bottom:1px solid #d8ded8;background:#f8f6ef}
       .brand{font-weight:800;letter-spacing:.08em;font-size:15px}
-      .nav-links{display:flex;gap:24px;font-size:14px;color:var(--muted)}
+      .switcher{display:flex;flex-wrap:wrap;gap:8px}
+      .prod-tab{border:1px solid #cad6ce;border-radius:999px;background:#fff;color:var(--ink);padding:7px 14px;font:650 13px/1.2 inherit;cursor:pointer;transition:all .15s}
+      .prod-tab:hover{border-color:var(--brand);background:#eef5f0}
+      .prod-tab.active{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:0 4px 12px #173f2b24}
+      .nav-links{display:flex;gap:20px;font-size:13.5px;color:var(--muted)}
       .nav-links a{color:inherit;text-decoration:none;font-weight:600}
       .nav-links a:hover{color:var(--ink)}
-      .product-detail{max-width:1120px;margin:48px auto;padding:0 24px;display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:start}
+
+      .product-detail{max-width:1120px;margin:40px auto;padding:0 24px;display:grid;grid-template-columns:1fr 1fr;gap:52px;align-items:start}
       .photo-col{display:flex;flex-direction:column;gap:20px}
-      .photo{min-height:460px;border-radius:28px;background:radial-gradient(circle at 30% 25%,#cfe0d2,#4d735c);display:grid;place-items:center;position:relative;overflow:hidden;box-shadow:0 22px 50px #18312618}
+      .photo{min-height:430px;border-radius:28px;background:radial-gradient(circle at 30% 25%,#cfe0d2,#4d735c);display:grid;place-items:center;position:relative;overflow:hidden;box-shadow:0 22px 50px #18312618}
+      .photo[data-theme="shoe"]{background:radial-gradient(circle at 30% 25%,#dbe7f5,#3c5a78)}
+      .photo[data-theme="dress"]{background:radial-gradient(circle at 30% 25%,#f2e6dc,#8c6c56)}
       .photo-badge{position:absolute;top:18px;left:18px;padding:6px 12px;border-radius:999px;background:#ffffffd9;color:var(--brand);font-size:12px;font-weight:700;letter-spacing:.04em}
       .photo svg{width:210px;height:210px;filter:drop-shadow(0 18px 28px #10241938)}
       .reviews-block{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:18px}
@@ -29,14 +36,15 @@
       .review-meta{display:flex;justify-content:space-between;color:#7b5b16;font-weight:700;font-size:12px;margin-bottom:4px}
       .review-card p{margin:0;color:var(--muted)}
       .eyebrow{color:#44705a;text-transform:uppercase;font-size:12px;font-weight:800;letter-spacing:.15em}
-      h1{font:600 clamp(36px,4.6vw,58px)/1.04 Georgia,serif;margin:10px 0 16px}
-      .price-row{display:flex;align-items:baseline;gap:14px}
+      h1{font:600 clamp(34px,4.4vw,54px)/1.06 Georgia,serif;margin:10px 0 14px}
+      .price-row{display:flex;flex-wrap:wrap;align-items:baseline;gap:12px}
       .price{font-size:26px;font-weight:800}
+      .discount-price{padding:4px 10px;border-radius:999px;background:#e8f6ee;color:#1b683b;font-size:13.5px;font-weight:750}
       .rating-inline{font-size:14px;color:#7b5b16;font-weight:700}
-      .stock{color:var(--accent);margin:6px 0 18px;font-size:14px;font-weight:600}
-      .description{color:var(--muted);margin:0 0 20px}
-      .specs{margin:24px 0;padding:0;list-style:none;border-top:1px solid #ccd5ce}
-      .specs li{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #ccd5ce;font-size:15px}
+      .stock{color:var(--accent);margin:8px 0 18px;font-size:14px;font-weight:600}
+      .description{color:var(--muted);margin:0 0 18px}
+      .specs{margin:22px 0;padding:0;list-style:none;border-top:1px solid #ccd5ce}
+      .specs li{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid #ccd5ce;font-size:15px}
       .buy{width:100%;border:0;border-radius:14px;padding:15px;background:var(--brand);color:#fff;font-weight:700;font-size:16px;cursor:pointer}
       .buy:hover{background:#123222}
 
@@ -50,8 +58,7 @@
       .caps{display:flex;flex-wrap:wrap;gap:8px}
       .cap-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid var(--line);background:#f7faf8;color:var(--ink)}
       .cap-pill[data-state="ready"]{background:#e8f6ee;border-color:#b8dfc7;color:#175933}
-      .cap-pill[data-state="warn"]{background:#fff8eb;border-color:#f0d8a8;color:#7a5411}
-      .cap-pill[data-state="zero"]{background:#e8f6ee;border-color:#b8dfc7;color:#175933}
+      .cap-pill[data-state="hybrid"]{background:#eef4ff;border-color:#c8dcff;color:#1d4ed8}
 
       .inspector-controls{margin-top:20px;display:flex;flex-direction:column;gap:12px}
       .chip-row{display:flex;flex-wrap:wrap;gap:8px}
@@ -62,7 +69,10 @@
       .inspector-form input:focus{outline:2px solid #84c7a0;border-color:var(--brand)}
       .inspector-form button{border:0;border-radius:12px;padding:11px 18px;background:var(--brand);color:#fff;font:700 14px inherit;cursor:pointer}
 
-      .inspector-grid{display:grid;grid-template-columns:1fr 1.35fr;gap:20px;margin-top:22px}
+      .payload-banner{margin-top:16px;padding:11px 14px;border-radius:12px;background:#edf4ff;border:1px solid #cfe0fc;color:#1e3a8a;font-size:13px;font-weight:650;display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px}
+      .payload-banner[data-gate="true"]{background:#e8f6ee;border-color:#bfe2cd;color:#175933}
+
+      .inspector-grid{display:grid;grid-template-columns:1fr 1.35fr;gap:20px;margin-top:18px}
       .panel-box{background:#f8faf8;border:1px solid var(--line);border-radius:18px;padding:18px}
       .panel-title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#3d5347}
       .badge{padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;background:#e4efe8;color:var(--brand);text-transform:none;letter-spacing:0}
@@ -89,10 +99,10 @@
 
       @media(max-width:860px){
         .product-detail,.inspector-grid,.setup-grid{grid-template-columns:1fr;gap:28px}
-        .photo{min-height:320px}
+        .photo{min-height:300px}
       }
     </style>
-    <script type="application/ld+json">{
+    <script id="product-jsonld" type="application/ld+json">{
       "@context": "https://schema.org",
       "@type": "Product",
       "name": "Terra Trail Pack 28L",
@@ -130,101 +140,46 @@
     }</script>
   </head>
   <body>
-    <nav>
-      <div class="brand">NORTHWIND</div>
+    <nav data-pdp-assistant-ignore>
+      <div class="brand">PRIVATE PDP DEMO</div>
+      <div class="switcher" role="tablist" aria-label="Switch demo product category">
+        <button type="button" class="prod-tab active" data-product="backpack" role="tab" aria-selected="true">Outdoor Pack · EN</button>
+        <button type="button" class="prod-tab" data-product="shoe" role="tab" aria-selected="false">Koşu Ayakkabısı · TR</button>
+        <button type="button" class="prod-tab" data-product="dress" role="tab" aria-selected="false">Keten Elbise · TR</button>
+      </div>
       <div class="nav-links">
         <a href="#pipeline-inspector">Pipeline Inspector</a>
         <a href="https://github.com/KadirChelik/private-pdp-assistant" target="_blank" rel="noopener noreferrer">GitHub</a>
       </div>
     </nav>
 
-    <main class="product-detail" itemscope itemtype="https://schema.org/Product">
-      <div class="photo-col">
-        <div class="photo" role="img" aria-label="Moss green trail backpack illustration">
-          <span class="photo-badge">Zero-Network PDP Demo</span>
-          <svg viewBox="0 0 128 128" fill="none" aria-hidden="true">
-            <path d="M44 26c0-9 9-14 20-14s20 5 20 14" stroke="#173f2b" stroke-width="6" stroke-linecap="round"/>
-            <rect x="28" y="26" width="72" height="86" rx="22" fill="#173f2b"/>
-            <path d="M36 48c0-8 6-14 14-14h28c8 0 14 6 14 14v12H36V48Z" fill="#235b3f"/>
-            <rect x="42" y="68" width="44" height="30" rx="10" fill="#2d6e4c"/>
-            <path d="M56 54h16" stroke="#b9dfc7" stroke-width="4" stroke-linecap="round"/>
-            <path d="M48 76h32" stroke="#b9dfc7" stroke-width="3" stroke-linecap="round"/>
-          </svg>
-        </div>
-
-        <section class="reviews-block" aria-label="Customer reviews">
-          <div class="reviews-head">
-            <strong>Customer Reviews</strong>
-            <span>★ 4.8 / 5 (3 reviews)</span>
-          </div>
-          <div class="review-list">
-            <article class="review-card" itemprop="review">
-              <div class="review-meta"><span>★ 5 / 5</span><span>Verified hiker</span></div>
-              <p itemprop="reviewBody">Light on the shoulders even on 18 km day hikes, and the ventilated back panel stays comfortable.</p>
-            </article>
-            <article class="review-card" itemprop="review">
-              <div class="review-meta"><span>★ 5 / 5</span><span>Daily commuter</span></div>
-              <p itemprop="reviewBody">Fits my 16-inch laptop neatly in the padded sleeve with room left for rain gear.</p>
-            </article>
-            <article class="review-card" itemprop="review">
-              <div class="review-meta"><span>★ 4 / 5</span><span>Weekend camper</span></div>
-              <p itemprop="reviewBody">Tough ripstop fabric handles wet trail conditions well. Wish it had one extra side pocket.</p>
-            </article>
-          </div>
-        </section>
-      </div>
-
-      <section>
-        <div class="eyebrow" itemprop="brand">Northwind Goods</div>
-        <h1 itemprop="name">Terra Trail Pack 28L</h1>
-        <div class="price-row">
-          <div class="price" itemprop="price">$129.00</div>
-          <div class="rating-inline">★ 4.8 / 5 · 3 reviews</div>
-        </div>
-        <div class="stock" itemprop="availability">In stock — ships in 1–2 days</div>
-        <p class="description" itemprop="description">
-          A weather-resistant daypack built for long trails and short escapes. Ventilated back panel and contoured shoulder straps keep the load comfortable all day.
-        </p>
-        <ul class="specs">
-          <li><span>Capacity</span><strong>28 litres</strong></li>
-          <li><span>Weight</span><strong>980 g</strong></li>
-          <li><span>Material</span><strong>Recycled ripstop nylon</strong></li>
-          <li><span>Laptop sleeve</span><strong>Up to 16 inches</strong></li>
-          <li><span>Warranty</span><strong>Lifetime repairs</strong></li>
-        </ul>
-        <button class="buy" type="button">Add to bag</button>
-      </section>
-    </main>
+    <main id="product-root" class="product-detail" itemscope itemtype="https://schema.org/Product"></main>
 
     <section id="pipeline-inspector" class="inspector" data-pdp-assistant-ignore>
       <div class="inspector-shell">
         <div class="inspector-top">
           <div>
-            <div class="inspector-eyebrow">Works in Any Browser · Client-Only Diagnostics</div>
-            <h2>Live On-Device Pipeline Inspector</h2>
+            <div class="inspector-eyebrow">Local-First 3-Tier Hybrid Architecture · Live Diagnostics</div>
+            <h2>Live Extraction &amp; Minimized Cloud Payload Inspector</h2>
             <p>
-              Inspect the real <code>ProductContext</code> extraction, TR/EN intent detection, and ranked evidence retrieval running directly in this tab. When Chrome Gemini Nano is active, the floating widget in the bottom-right corner sends only the matched evidence below.
+              Every browser extracts Schema.org JSON-LD and DOM context locally. If Chrome Gemini Nano is already available locally, answers cost <strong>$0 / 0 B</strong>. Otherwise, only the matched facts below (~150 tokens, zero HTML) go to <code>/api/ask</code> — and unsupported questions stop locally at <strong>0 bytes</strong>.
             </p>
           </div>
           <div class="caps">
-            <span id="cap-nano" class="cap-pill" data-state="warn">Gemini Nano: Checking…</span>
-            <span id="cap-translator" class="cap-pill" data-state="warn">Translator API: Checking…</span>
-            <span class="cap-pill" data-state="zero">Network Requests: 0</span>
+            <span id="cap-tier" class="cap-pill" data-state="hybrid">Tier 2 Hybrid: Active (0 MB download)</span>
+            <span class="cap-pill" data-state="ready">Architecture: 3-Tier Local-First</span>
           </div>
         </div>
 
         <div class="inspector-controls">
-          <div class="chip-row" id="inspector-chips">
-            <button type="button" class="q-chip active" data-q="What is the capacity and weight?">What is the capacity and weight?</button>
-            <button type="button" class="q-chip" data-q="What is the warranty?">What is the warranty?</button>
-            <button type="button" class="q-chip" data-q="What do customer reviews say?">What do customer reviews say?</button>
-            <button type="button" class="q-chip" data-q="Does it come in red?">Does it come in red? (Not on page)</button>
-          </div>
+          <div class="chip-row" id="inspector-chips"></div>
           <form class="inspector-form" id="inspector-form">
-            <input id="inspector-question" type="text" value="What is the capacity and weight?" placeholder="Type a product question to trace intent & evidence retrieval…" aria-label="Question to inspect" />
+            <input id="inspector-question" type="text" value="" placeholder="Ask any custom EN or TR question to trace extraction & minimized payload…" aria-label="Question to inspect" />
             <button type="submit">Inspect Retrieval</button>
           </form>
         </div>
+
+        <div id="payload-banner" class="payload-banner" data-gate="false"></div>
 
         <div class="inspector-grid">
           <div class="panel-box">
@@ -253,8 +208,8 @@
             <pre id="inject-snippet">(()=>{const s=document.createElement('script');s.src='https://private-pdp-assistant.vercel.app/private-pdp-assistant.js';s.crossOrigin='anonymous';document.head.append(s)})()</pre>
           </div>
           <div class="flags-box">
-            <strong>Try live local generation in Desktop Chrome</strong>
-            Enable <code>chrome://flags/#optimization-guide-on-device-model</code> and <code>chrome://flags/#prompt-api-for-gemini-nano</code>, relaunch Chrome, and open the widget in the bottom-right corner. Turkish chat also downloads Chrome’s local <code>window.Translator</code> packs automatically.
+            <strong>3-Tier Fallback Guarantee (Zero 1.5 GB Forced Download)</strong>
+            <strong>1) On-Device Nano</strong> (used only when already <code>available</code>) → <strong>2) Minimized Cloud</strong> (<code>/api/ask</code> Gemini → Groq → OpenRouter with matched facts only) → <strong>3) Offline Local</strong> (category-agnostic extractive fallback). Override via <code>window.PDPAssistantConfig = { mode: 'local-only' }</code>.
           </div>
         </div>
       </div>
@@ -263,14 +218,169 @@
     <script type="module" src="/src/main.ts"></script>
     <script>
       (function () {
-        const nanoBadge = document.getElementById('cap-nano')
-        const translatorBadge = document.getElementById('cap-translator')
+        const PRODUCTS = {
+          backpack: {
+            lang: 'en',
+            theme: 'pack',
+            badge: 'Outdoor · Hybrid PDP Demo',
+            brand: 'Northwind Goods',
+            title: 'Terra Trail Pack 28L',
+            priceText: '$129.00',
+            basketDiscount: '',
+            ratingText: '★ 4.8 / 5 · 3 reviews',
+            stockText: 'In stock — ships in 1–2 days',
+            buyLabel: 'Add to bag',
+            reviewsHeading: 'Customer Reviews',
+            reviewsSub: '★ 4.8 / 5 (3 reviews)',
+            description: 'A weather-resistant daypack built for long trails and short escapes. Ventilated back panel and contoured shoulder straps keep the load comfortable all day.',
+            svg: '<svg viewBox="0 0 128 128" fill="none" aria-hidden="true"><path d="M44 26c0-9 9-14 20-14s20 5 20 14" stroke="#173f2b" stroke-width="6" stroke-linecap="round"/><rect x="28" y="26" width="72" height="86" rx="22" fill="#173f2b"/><path d="M36 48c0-8 6-14 14-14h28c8 0 14 6 14 14v12H36V48Z" fill="#235b3f"/><rect x="42" y="68" width="44" height="30" rx="10" fill="#2d6e4c"/><path d="M56 54h16" stroke="#b9dfc7" stroke-width="4" stroke-linecap="round"/><path d="M48 76h32" stroke="#b9dfc7" stroke-width="3" stroke-linecap="round"/></svg>',
+            specs: [
+              ['Capacity', '28 litres'],
+              ['Weight', '980 g'],
+              ['Material', 'Recycled ripstop nylon'],
+              ['Laptop sleeve', 'Up to 16 inches'],
+              ['Warranty', 'Lifetime repairs'],
+            ],
+            reviews: [
+              { rating: 5, author: 'Verified hiker', body: 'Light on the shoulders even on 18 km day hikes, and the ventilated back panel stays comfortable.' },
+              { rating: 5, author: 'Daily commuter', body: 'Fits my 16-inch laptop neatly in the padded sleeve with room left for rain gear.' },
+              { rating: 4, author: 'Weekend camper', body: 'Tough ripstop fabric handles wet trail conditions well. Wish it had one extra side pocket.' },
+            ],
+            jsonLd: {
+              '@context': 'https://schema.org',
+              '@type': 'Product',
+              name: 'Terra Trail Pack 28L',
+              description: 'A weather-resistant daypack built for long trails and short escapes. Ventilated back panel and contoured shoulder straps keep the load comfortable all day.',
+              sku: 'TTP-28-MOSS',
+              brand: { '@type': 'Brand', name: 'Northwind Goods' },
+              offers: { '@type': 'Offer', price: '129.00', priceCurrency: 'USD', availability: 'https://schema.org/InStock' },
+              aggregateRating: { '@type': 'AggregateRating', ratingValue: '4.8', reviewCount: '3' },
+              review: [
+                { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'Light on the shoulders even on 18 km day hikes, and the ventilated back panel stays comfortable.' },
+                { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'Fits my 16-inch laptop neatly in the padded sleeve with room left for rain gear.' },
+                { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '4' }, reviewBody: 'Tough ripstop fabric handles wet trail conditions well. Wish it had one extra side pocket.' },
+              ],
+            },
+            chips: [
+              'Can it fit a 16-inch MacBook?',
+              'How heavy is this backpack?',
+              'What do customer reviews say?',
+              'Does it come in red?',
+            ],
+          },
+          shoe: {
+            lang: 'tr',
+            theme: 'shoe',
+            badge: 'Ayakkabı · Türkçe PDP Demo',
+            brand: 'AeroStride',
+            title: 'AeroStride Pro Koşu Ayakkabısı',
+            priceText: '3.499 TL',
+            basketDiscount: 'Sepette 2.999 TL',
+            ratingText: '★ 4.6 / 5 · 3 yorum',
+            stockText: 'Stokta var — 24 saat içinde kargoda',
+            buyLabel: 'Sepete Ekle',
+            reviewsHeading: 'Müşteri Yorumları',
+            reviewsSub: '★ 4.6 / 5 (3 yorum)',
+            description: 'Günlük tempo koşuları ve uzun mesafe antrenmanları için geliştirilen hafif koşu ayakkabısı. Çift yoğunluklu EVA orta taban darbe emilimi sağlarken nefes alan file saya ayağı serin tutar.',
+            svg: '<svg viewBox="0 0 128 128" fill="none" aria-hidden="true"><path d="M18 76c16 0 24-22 34-26l14 14c10 9 26 9 42 12 4 1 6 5 6 10v6H18V76Z" fill="#1b3a57"/><path d="M18 88h96v10c0 4-3 7-7 7H25c-4 0-7-3-7-7V88Z" fill="#e6eef7"/><path d="M50 56l18 14" stroke="#8ab4e1" stroke-width="4" stroke-linecap="round"/><path d="M40 66l14 10" stroke="#8ab4e1" stroke-width="4" stroke-linecap="round"/></svg>',
+            specs: [
+              ['Taban', 'EVA orta taban + Kauçuk dış taban'],
+              ['Kalıp', 'Tam kalıp'],
+              ['Ağırlık', '245 g (42 numara)'],
+              ['Üst Yüzey', 'Nefes alan mühendislik file'],
+              ['Topuk Dropu', '8 mm'],
+              ['Garanti', '2 Yıl üretici garantisi'],
+            ],
+            reviews: [
+              { rating: 5, author: 'Maraton koşucusu', body: 'Çok hafif ve yastıklaması dizleri yormuyor. Tam numara aldım tam oldu.' },
+              { rating: 4, author: 'Günlük koşucu', body: 'Nefes alan file yüzeyi yazın terletmiyor; ancak geniş taraklı ayaklarda yarım numara büyük tercih edilebilir.' },
+              { rating: 5, author: 'Doğrulanmış alıcı', body: 'Islak asfaltta kauçuk taban tutuşu gayet güven veriyor, kargo ertesi gün ulaştı.' },
+            ],
+            jsonLd: {
+              '@context': 'https://schema.org',
+              '@type': 'Product',
+              name: 'AeroStride Pro Koşu Ayakkabısı',
+              description: 'Günlük tempo koşuları ve uzun mesafe antrenmanları için geliştirilen hafif koşu ayakkabısı. Çift yoğunluklu EVA orta taban darbe emilimi sağlarken nefes alan file saya ayağı serin tutar.',
+              sku: 'ASP-RUN-42',
+              brand: { '@type': 'Brand', name: 'AeroStride' },
+              offers: { '@type': 'Offer', price: '3499', priceCurrency: 'TRY', availability: 'https://schema.org/InStock' },
+              aggregateRating: { '@type': 'AggregateRating', ratingValue: '4.6', reviewCount: '3' },
+              review: [
+                { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'Çok hafif ve yastıklaması dizleri yormuyor. Tam numara aldım tam oldu.' },
+                { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '4' }, reviewBody: 'Nefes alan file yüzeyi yazın terletmiyor; ancak geniş taraklı ayaklarda yarım numara büyük tercih edilebilir.' },
+                { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'Islak asfaltta kauçuk taban tutuşu gayet güven veriyor, kargo ertesi gün ulaştı.' },
+              ],
+            },
+            chips: [
+              'Geniş taraklı ayağa olur mu, kalıbı nasıl?',
+              'Sepette fiyatı ne kadar?',
+              'Tabanı ve ağırlığı nasıl?',
+              'Kırmızı rengi var mı?',
+            ],
+          },
+          dress: {
+            lang: 'tr',
+            theme: 'dress',
+            badge: 'Giyim · Türkçe PDP Demo',
+            brand: 'Solis Atelier',
+            title: 'Solis %100 Keten Midi Elbise',
+            priceText: '2.190 TL',
+            basketDiscount: '',
+            ratingText: '★ 4.9 / 5 · 3 yorum',
+            stockText: 'Stokta var — aynı gün kargo',
+            buyLabel: 'Sepete Ekle',
+            reviewsHeading: 'Müşteri Yorumları',
+            reviewsSub: '★ 4.9 / 5 (3 yorum)',
+            description: 'Sıcak yaz günleri ve açık hava davetleri için tasarlanmış nefes alan %100 doğal keten midi elbise. İnce pamuklu iç astarı sayesinde iç göstermez ve rahat kesimiyle gün boyu konfor sunar.',
+            svg: '<svg viewBox="0 0 128 128" fill="none" aria-hidden="true"><path d="M48 22l16 10 16-10 8 20-10 6 14 58H36l14-58-10-6 8-20Z" fill="#5c4232"/><path d="M50 48h28" stroke="#e9d8ca" stroke-width="3" stroke-linecap="round"/></svg>',
+            specs: [
+              ['Kumaş', '%100 Doğal Keten'],
+              ['Kalıp', 'Rahat kesim'],
+              ['Boy', 'Midi (118 cm)'],
+              ['Astar', 'Pamuklu iç astar (iç göstermez)'],
+              ['Yıkama', '30°C hassas yıkama'],
+              ['Renk', 'Bej'],
+            ],
+            reviews: [
+              { rating: 5, author: 'Doğrulanmış alıcı', body: 'Yaz düğününde giydim, %100 keten olduğu için hiç terletmedi ve astarı sayesinde iç göstermiyor.' },
+              { rating: 5, author: 'Müşteri', body: 'Kalıbı rahat kesim, kendi bedeninizi alabilirsiniz. Doğal keten olduğu için ilk yıkamadan sonra hafif ütü istiyor.' },
+              { rating: 5, author: 'Müşteri', body: 'Bej rengi çok şık duruyor, 30 derecede hassas yıkamada çekme yapmadı.' },
+            ],
+            jsonLd: {
+              '@context': 'https://schema.org',
+              '@type': 'Product',
+              name: 'Solis %100 Keten Midi Elbise',
+              description: 'Sıcak yaz günleri ve açık hava davetleri için tasarlanmış nefes alan %100 doğal keten midi elbise. İnce pamuklu iç astarı sayesinde iç göstermez ve rahat kesimiyle gün boyu konfor sunar.',
+              sku: 'SLS-LINEN-BEJ',
+              brand: { '@type': 'Brand', name: 'Solis Atelier' },
+              offers: { '@type': 'Offer', price: '2190', priceCurrency: 'TRY', availability: 'https://schema.org/InStock' },
+              aggregateRating: { '@type': 'AggregateRating', ratingValue: '4.9', reviewCount: '3' },
+              review: [
+                { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'Yaz düğününde giydim, %100 keten olduğu için hiç terletmedi ve astarı sayesinde iç göstermiyor.' },
+                { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'Kalıbı rahat kesim, kendi bedeninizi alabilirsiniz. Doğal keten olduğu için ilk yıkamadan sonra hafif ütü istiyor.' },
+                { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'Bej rengi çok şık duruyor, 30 derecede hassas yıkamada çekme yapmadı.' },
+              ],
+            },
+            chips: [
+              'Yaz düğününde terletir mi, iç gösterir mi?',
+              'Nasıl yıkanır, çekme yapar mı?',
+              'Kalıbı nasıl?',
+              'Siyah rengi var mı?',
+            ],
+          },
+        }
+
+        const tierBadge = document.getElementById('cap-tier')
         const ctxSourceBadge = document.getElementById('ctx-source-badge')
         const ctxSummary = document.getElementById('ctx-summary')
         const intentBadge = document.getElementById('retrieval-intent-badge')
         const resultsEl = document.getElementById('retrieval-results')
+        const payloadBanner = document.getElementById('payload-banner')
         const inputEl = document.getElementById('inspector-question')
-        const chips = Array.from(document.querySelectorAll('.q-chip'))
+        const chipsContainer = document.getElementById('inspector-chips')
+        const productRoot = document.getElementById('product-root')
+        const jsonLdEl = document.getElementById('product-jsonld')
+        const productTabs = Array.from(document.querySelectorAll('.prod-tab'))
 
         function esc(value) {
           const span = document.createElement('span')
@@ -278,28 +388,78 @@
           return span.innerHTML
         }
 
+        function renderProduct(key) {
+          const p = PRODUCTS[key] || PRODUCTS.backpack
+          document.documentElement.lang = p.lang
+          jsonLdEl.textContent = JSON.stringify(p.jsonLd)
+
+          const specsHtml = p.specs.map(function (pair) {
+            return '<li><span>' + esc(pair[0]) + '</span><strong>' + esc(pair[1]) + '</strong></li>'
+          }).join('')
+          const reviewsHtml = p.reviews.map(function (r) {
+            return '<article class="review-card" itemprop="review">' +
+              '<div class="review-meta"><span>★ ' + esc(r.rating) + ' / 5</span><span>' + esc(r.author) + '</span></div>' +
+              '<p itemprop="reviewBody">' + esc(r.body) + '</p></article>'
+          }).join('')
+
+          productRoot.innerHTML =
+            '<div class="photo-col">' +
+              '<div class="photo" data-theme="' + esc(p.theme) + '" role="img" aria-label="' + esc(p.title) + '">' +
+                '<span class="photo-badge">' + esc(p.badge) + '</span>' + p.svg +
+              '</div>' +
+              '<section class="reviews-block" aria-label="' + esc(p.reviewsHeading) + '">' +
+                '<div class="reviews-head"><strong>' + esc(p.reviewsHeading) + '</strong><span>' + esc(p.reviewsSub) + '</span></div>' +
+                '<div class="review-list">' + reviewsHtml + '</div>' +
+              '</section>' +
+            '</div>' +
+            '<section>' +
+              '<div class="eyebrow" itemprop="brand">' + esc(p.brand) + '</div>' +
+              '<h1 itemprop="name">' + esc(p.title) + '</h1>' +
+              '<div class="price-row">' +
+                '<div class="price" itemprop="price">' + esc(p.priceText) + '</div>' +
+                (p.basketDiscount ? '<div class="discount-price">' + esc(p.basketDiscount) + '</div>' : '') +
+                '<div class="rating-inline">' + esc(p.ratingText) + '</div>' +
+              '</div>' +
+              '<div class="stock" itemprop="availability">' + esc(p.stockText) + '</div>' +
+              '<p class="description" itemprop="description">' + esc(p.description) + '</p>' +
+              '<ul class="specs">' + specsHtml + '</ul>' +
+              '<button class="buy" type="button">' + esc(p.buyLabel) + '</button>' +
+            '</section>'
+
+          chipsContainer.innerHTML = p.chips.map(function (q, idx) {
+            return '<button type="button" class="q-chip' + (idx === 0 ? ' active' : '') + '" data-q="' + esc(q) + '">' + esc(q) + '</button>'
+          }).join('')
+
+          Array.from(chipsContainer.querySelectorAll('.q-chip')).forEach(function (btn) {
+            btn.addEventListener('click', function () {
+              setActiveQuestion(btn.dataset.q || '')
+            })
+          })
+
+          inputEl.value = p.chips[0] || ''
+          productTabs.forEach(function (tab) {
+            const active = tab.dataset.product === key
+            tab.classList.toggle('active', active)
+            tab.setAttribute('aria-selected', String(active))
+          })
+
+          window.PDPAssistant && window.PDPAssistant.refresh && window.PDPAssistant.refresh()
+          renderInspector(inputEl.value)
+        }
+
         async function detectCapabilities() {
           try {
             if (window.LanguageModel && typeof window.LanguageModel.availability === 'function') {
               const status = await window.LanguageModel.availability()
-              nanoBadge.textContent = 'Gemini Nano: ' + status
-              nanoBadge.dataset.state = status === 'available' ? 'ready' : 'warn'
-            } else {
-              nanoBadge.textContent = 'Gemini Nano: Unavailable (Inspector Active)'
-              nanoBadge.dataset.state = 'warn'
+              if (status === 'available') {
+                tierBadge.textContent = 'Tier 1 On-Device: Ready ($0)'
+                tierBadge.dataset.state = 'ready'
+                return
+              }
             }
-          } catch {
-            nanoBadge.textContent = 'Gemini Nano: Unavailable (Inspector Active)'
-            nanoBadge.dataset.state = 'warn'
-          }
-
-          if (window.Translator && typeof window.Translator.create === 'function') {
-            translatorBadge.textContent = 'Translator API: Supported'
-            translatorBadge.dataset.state = 'ready'
-          } else {
-            translatorBadge.textContent = 'Translator API: Unavailable'
-            translatorBadge.dataset.state = 'warn'
-          }
+          } catch {}
+          tierBadge.textContent = 'Tier 2 Hybrid: Active (0 MB download)'
+          tierBadge.dataset.state = 'hybrid'
         }
 
         function renderInspector(question) {
@@ -315,9 +475,13 @@
           const sources = (ctx.dataSource && ctx.dataSource.length) ? ctx.dataSource.join(' + ') : 'visible dom'
           ctxSourceBadge.textContent = sources + ' · ' + index.length + ' evidence items'
 
+          const priceDisplay = ctx.basketPrice
+            ? ctx.listedPrice + ' (Sepet: ' + ctx.basketPrice + ')'
+            : (ctx.listedPrice || '—')
+
           const rows = [
             ['Title', ctx.title || '—'],
-            ['Price (' + (ctx.priceSource || 'dom') + ')', ctx.listedPrice || '—'],
+            ['Price (' + (ctx.priceSource || 'dom') + ')', priceDisplay],
             ['Availability', ctx.availability || '—'],
             ['Rating', ctx.rating ? ctx.rating + ' / 5 (' + (ctx.reviewCount || 0) + ' reviews)' : '—'],
             ['Extracted Specs', Object.keys(ctx.specs || {}).length + ' attributes'],
@@ -330,13 +494,28 @@
           intentBadge.textContent = 'intent: ' + intent + ' · ' + matched.length + ' / ' + index.length + ' matched'
 
           if (!matched.length) {
+            payloadBanner.dataset.gate = 'true'
+            payloadBanner.innerHTML = '<span>Payload if Cloud Fallback: <strong>0 bytes — Local NOT_FOUND Gate</strong></span><span>0 HTML · 0 cookies · 0 API spend</span>'
             resultsEl.innerHTML =
               '<div class="not-found-box">' +
-              '<strong>No matching page evidence → Strict NOT_FOUND Grounding</strong>' +
-              'No attribute, spec, or review on this page supports "' + esc(q) + '". Rather than hallucinating or calling a cloud API, the prompt instructs Gemini Nano to reply: <em>"I could not find this information on the product page."</em>' +
+              '<strong>No matching page evidence → Local NOT_FOUND Gate (0 bytes sent)</strong>' +
+              'No attribute, spec, or review on this page supports "' + esc(q) + '". Stopped locally in 0 ms without calling Gemini Nano or /api/ask.' +
               '</div>'
             return
           }
+
+          const topEvidence = matched.slice(0, 6).map(function (item) {
+            return (item.label ? item.label + ': ' : '') + item.value
+          })
+          const approxBytes = new TextEncoder().encode(JSON.stringify({
+            question: q,
+            productTitle: ctx.title || '',
+            detectedIntent: intent,
+            evidence: topEvidence,
+          })).length
+
+          payloadBanner.dataset.gate = 'false'
+          payloadBanner.innerHTML = '<span>Payload if Cloud Fallback: <strong>' + topEvidence.length + ' facts · ~' + approxBytes + ' bytes</strong></span><span>0 HTML · 0 cookies · 0 PII</span>'
 
           resultsEl.innerHTML = matched.slice(0, 5).map(function (item) {
             return (
@@ -353,21 +532,21 @@
 
         function setActiveQuestion(q) {
           inputEl.value = q
-          chips.forEach(function (btn) {
+          Array.from(chipsContainer.querySelectorAll('.q-chip')).forEach(function (btn) {
             btn.classList.toggle('active', btn.dataset.q === q)
           })
           renderInspector(q)
         }
 
-        chips.forEach(function (btn) {
-          btn.addEventListener('click', function () {
-            setActiveQuestion(btn.dataset.q || '')
+        productTabs.forEach(function (tab) {
+          tab.addEventListener('click', function () {
+            renderProduct(tab.dataset.product || 'backpack')
           })
         })
 
         document.getElementById('inspector-form').addEventListener('submit', function (e) {
           e.preventDefault()
-          chips.forEach(function (btn) {
+          Array.from(chipsContainer.querySelectorAll('.q-chip')).forEach(function (btn) {
             btn.classList.toggle('active', btn.dataset.q === inputEl.value.trim())
           })
           renderInspector(inputEl.value)
@@ -382,6 +561,8 @@
             setTimeout(function () { btn.textContent = 'Copy snippet' }, 1400)
           } catch {}
         })
+
+        renderProduct('backpack')
 
         function init() {
           detectCapabilities()

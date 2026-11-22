@@ -224,13 +224,24 @@ export interface TranslatorOptions {
   signal?: AbortSignal
 }
 
+export type AssistantMode = 'hybrid' | 'local-only'
+
+export type AnswerEngine = 'nano' | 'cloud' | 'local-extractive' | 'local-gate'
+
+export interface PDPAssistantConfig {
+  apiEndpoint?: string
+  mode?: AssistantMode
+}
+
 declare global {
   interface Window {
     LanguageModel?: LanguageModelFactory
     Translator?: TranslatorFactory
+    PDPAssistantConfig?: PDPAssistantConfig
     PDPAssistant?: {
       mount: () => void
       unmount: () => void
+      refresh?: () => void
       debugContext?: () => ProductContext
       debugEvidenceIndex?: () => EvidenceItem[]
       debugRetrieveEvidence?: (question: string) => EvidenceItem[]
