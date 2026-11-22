@@ -19,6 +19,7 @@ export interface CloudAnswerResponse {
 }
 
 const CLOUD_TIMEOUT_MS = 14_000
+export const DEFAULT_CLOUD_ORIGIN = 'https://private-pdp-assistant.vercel.app'
 
 export function getAssistantMode(): AssistantMode {
   if (typeof window !== 'undefined' && window.PDPAssistantConfig?.mode === 'local-only') {
@@ -35,10 +36,15 @@ export function resolveApiEndpoint(scriptOrigin?: string): string {
   if (scriptOrigin) {
     return `${scriptOrigin.replace(/\/$/, '')}/api/ask`
   }
-  if (typeof location !== 'undefined' && location.origin && location.origin !== 'null') {
+  if (
+    typeof location !== 'undefined' &&
+    (location.hostname === 'localhost' ||
+      location.hostname === '127.0.0.1' ||
+      location.origin === DEFAULT_CLOUD_ORIGIN)
+  ) {
     return `${location.origin}/api/ask`
   }
-  return '/api/ask'
+  return `${DEFAULT_CLOUD_ORIGIN}/api/ask`
 }
 
 export async function requestCloudAnswer(
@@ -135,6 +141,15 @@ export function buildLocalExtractiveAnswer(
       .map((item) => item.value)
     if (deliveryItems.length) {
       return deliveryItems.join(' · ')
+    }
+  }
+
+  if (intent === 'returnPolicy') {
+    if (context.returnPolicyText) return context.returnPolicyText
+    if (context.returnDays !== undefined) {
+      return isTurkish
+        ? `Sayfadaki bilgilere göre iade süresi ${context.returnDays} gündür.`
+        : `According to the page details, returns are accepted within ${context.returnDays} days.`
     }
   }
 

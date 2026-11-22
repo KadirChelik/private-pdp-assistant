@@ -205,7 +205,7 @@
               <span>Inject on any e-commerce PDP via DevTools Console</span>
               <button type="button" class="copy-btn" id="copy-snippet">Copy snippet</button>
             </div>
-            <pre id="inject-snippet">(()=>{const s=document.createElement('script');s.src='https://private-pdp-assistant.vercel.app/private-pdp-assistant.js';s.crossOrigin='anonymous';document.head.append(s)})()</pre>
+            <pre id="inject-snippet">(()=>{const s=document.createElement('script');s.src='https://private-pdp-assistant.vercel.app/private-pdp-assistant.js';s.onerror=()=>console.warn('[PDP Assistant] Blocked by this site CSP.');document.head.append(s)})()</pre>
           </div>
           <div class="flags-box">
             <strong>3-Tier Fallback Guarantee (Zero 1.5 GB Forced Download)</strong>

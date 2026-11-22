@@ -583,6 +583,9 @@ export class AssistantWidget {
       image.alt = ''
       image.loading = 'lazy'
       image.referrerPolicy = 'no-referrer'
+      image.onerror = () => {
+        media.textContent = title.charAt(0).toLocaleUpperCase()
+      }
       media.append(image)
     } else {
       media.textContent = title.charAt(0).toLocaleUpperCase()

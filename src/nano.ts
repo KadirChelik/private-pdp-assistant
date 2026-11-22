@@ -1070,6 +1070,8 @@ export function buildEvidenceIndex(context: ProductContext): EvidenceItem[] {
     )
   }
 
+  addEvidence(items, 'returnPolicy', 'Return policy', context.returnPolicyText, 'return policy')
+
   addEvidence(items, 'shipping', 'Shipping fee', context.shippingFee, 'shipping details')
 
   const structuredTexts = items

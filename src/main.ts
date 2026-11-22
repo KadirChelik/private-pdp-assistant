@@ -7,27 +7,34 @@ let widget: AssistantWidget | undefined
 
 const SCRIPT_ORIGIN = (() => {
   try {
-    const script = document.currentScript as HTMLScriptElement | null
-    return script?.src ? new URL(script.src, location.href).origin : undefined
+    const current = document.currentScript as HTMLScriptElement | null
+    if (current?.src) return new URL(current.src, location.href).origin
+    const matched = document.querySelector<HTMLScriptElement>('script[src*="private-pdp-assistant"]')
+    return matched?.src ? new URL(matched.src, location.href).origin : undefined
   } catch {
     return undefined
   }
 })()
 
 function mount(): void {
-  if (document.getElementById(ROOT_ID)) return
+  const existing = document.getElementById(ROOT_ID)
+  if (existing) {
+    if (widget) {
+      widget.refresh()
+      return
+    }
+    existing.remove()
+  }
 
   const root = document.createElement('div')
   root.id = ROOT_ID
   root.dataset.pdpAssistant = ''
-  root.style.position = 'fixed'
-  root.style.right = '0'
-  root.style.bottom = '0'
-  root.style.zIndex = '2147483647'
-  document.documentElement.append(root)
+  root.style.cssText = 'all:initial;position:fixed;right:0;bottom:0;z-index:2147483647;pointer-events:none;'
+  ;(document.body || document.documentElement).append(root)
 
   widget = new AssistantWidget(root, SCRIPT_ORIGIN)
   widget.mount()
+  console.info('[Private PDP Assistant] Mounted — click the floating assistant button at bottom-right.')
 }
 
 function unmount(): void {
@@ -68,6 +75,8 @@ window.PDPAssistant.debugContext = debugContext
 window.PDPAssistant.debugEvidenceIndex = debugEvidenceIndex
 window.PDPAssistant.debugRetrieveEvidence = debugRetrieveEvidence
 window.PDPAssistant.detectIntent = detectQuestionIntent
+window.addEventListener('popstate', refresh)
+window.addEventListener('hashchange', refresh)
 window.dispatchEvent(new CustomEvent('pdp-assistant:ready'))
 
 if (document.readyState === 'loading') {

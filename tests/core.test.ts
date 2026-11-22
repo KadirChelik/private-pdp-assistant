@@ -4,7 +4,7 @@ import { JSDOM } from 'jsdom'
 
 import { __resetRateLimitsForTests, handleAskRequest } from '../api/ask.ts'
 import { extractProductContext, getSuggestedQuestions, parseSpecsFromDescription } from '../src/extractor.ts'
-import { buildLocalExtractiveAnswer } from '../src/fallback.ts'
+import { DEFAULT_CLOUD_ORIGIN, buildLocalExtractiveAnswer, resolveApiEndpoint } from '../src/fallback.ts'
 import {
   answerQuestion,
   createSession,
@@ -1217,4 +1217,114 @@ test('Solis dress, AeroStride shoe, and Terra pack unscripted TR/EN questions re
     prepareQuestionEvidence(packCtx, 'Does it have side pockets?').relevantEvidence.some((e) => /side pocket/i.test(e.value)),
   )
   assert.deepEqual(prepareQuestionEvidence(packCtx, 'Does this backpack have Bluetooth?').relevantEvidence, [])
+})
+
+test('resolveApiEndpoint uses deployed cloud origin instead of external e-commerce origin', () => {
+  const prevWindow = (globalThis as { window?: unknown }).window
+  const prevLocation = (globalThis as { location?: unknown }).location
+  try {
+    ;(globalThis as { window: unknown }).window = {}
+    ;(globalThis as { location: unknown }).location = {
+      origin: 'https://www.external-store.test',
+      hostname: 'www.external-store.test',
+    }
+    assert.equal(resolveApiEndpoint(undefined), `${DEFAULT_CLOUD_ORIGIN}/api/ask`)
+    assert.equal(resolveApiEndpoint('https://cdn.assistant.test/'), 'https://cdn.assistant.test/api/ask')
+
+    ;(globalThis as { location: unknown }).location = {
+      origin: 'http://localhost:5173',
+      hostname: 'localhost',
+    }
+    assert.equal(resolveApiEndpoint(undefined), 'http://localhost:5173/api/ask')
+  } finally {
+    if (prevWindow === undefined) delete (globalThis as { window?: unknown }).window
+    else (globalThis as { window: unknown }).window = prevWindow
+    if (prevLocation === undefined) delete (globalThis as { location?: unknown }).location
+    else (globalThis as { location: unknown }).location = prevLocation
+  }
+})
+
+test('extractProductContext decodes JSON-LD HTML entities and supports ProductGroup, AggregateOffer, and returnPolicyText', () => {
+  const restore = installDom(`<!doctype html><html lang="tr"><head>
+    <script type="application/ld+json">{
+      "@context": "https://schema.org",
+      "@type": "ProductGroup",
+      "name": "Yenilenmi&#x15F; Ak&#x131;ll&#x131; Telefon",
+      "description": "Vatan Bilgisayar&#x27;da 1 Y&#x131;l Garantili &amp; Test Edilmi&#x15F;",
+      "category": "Yenilenmi&#x15F; &gt; Telefon",
+      "hasVariant": [{
+        "@type": "Product",
+        "offers": {
+          "@type": "AggregateOffer",
+          "lowPrice": "46999",
+          "priceCurrency": "TRY",
+          "hasMerchantReturnPolicy": {
+            "merchantReturnDays": 14,
+            "description": "Mağazada 30 gün, kargo ile 14 gün içinde iade edilebilir."
+          }
+        }
+      }]
+    }</script>
+  </head><body><main class="product-detail"><h1>Yenilenmiş Akıllı Telefon</h1></main></body></html>`)
+
+  try {
+    const ctx = extractProductContext()
+    assert.equal(ctx.title, 'Yenilenmiş Akıllı Telefon')
+    assert.equal(ctx.description, "Vatan Bilgisayar'da 1 Yıl Garantili & Test Edilmiş")
+    assert.equal(ctx.category, 'Yenilenmiş > Telefon')
+    assert.equal(ctx.listedPrice, '46.999 TL')
+    assert.equal(ctx.returnDays, 14)
+    assert.match(ctx.returnPolicyText || '', /30 gün/)
+
+    const ret = prepareQuestionEvidence(ctx, 'İade koşulları nedir?')
+    assert.ok(ret.relevantEvidence.some((item) => /30 gün/.test(item.value)))
+  } finally {
+    restore()
+  }
+})
+
+test('extractProductContext handles split external PDP DOM containers, collapsed panels, and skips noisy spec suggestions', () => {
+  const restore = installDom(`<!doctype html><html lang="en"><body>
+    <div class="discount-price">Unrelated 5 TL</div>
+    <main class="product-detail">
+      <h1>External Book</h1>
+      <div class="product-detail-price" itemprop="price">46.999 TL</div>
+      <div class="ky-pd-attributes">
+        <div class="ky-pd-attributes__item"><span>Sayfa Sayısı:</span><span>236</span></div>
+        <div class="ky-pd-attributes__item"><span>Yayın Tarihi:</span><span>06.09.2000</span></div>
+      </div>
+    </main>
+    <div class="product-info">
+      <ul class="attribute-list">
+        <li class="attribute-item"><span>UPC</span><span>a897fe</span></li>
+        <li class="attribute-item"><span>Price (excl. tax)</span><span>£51.77</span></li>
+        <li class="attribute-item"><span>Tax</span><span>£0.00</span></li>
+        <li class="attribute-item"><span>Number of reviews</span><span>0</span></li>
+        <li class="attribute-item"><span>Availability</span><span>In stock</span></li>
+        <li class="attribute-item"><span>Paper Type</span><span>3. Hamur</span></li>
+      </ul>
+      <div class="modal-accordion-content dimensions-detail" style="display:none">
+        <p>Genişlik: 80 cm</p>
+        <p>Yükseklik: 202 cm</p>
+      </div>
+    </div>
+    <section data-pdp-assistant-ignore>
+      <ul class="specs"><li><span>Leaked Spec</span><strong>Never Extract</strong></li></ul>
+    </section>
+  </body></html>`)
+
+  try {
+    const ctx = extractProductContext()
+    assert.equal(ctx.basketPrice, undefined)
+    assert.equal(ctx.listedPrice, '46.999 TL')
+    assert.equal(ctx.specs['Sayfa Sayısı'], '236')
+    assert.equal(ctx.specs['Paper Type'], '3. Hamur')
+    assert.equal(ctx.specs['Genişlik'], '80 cm')
+    assert.equal(ctx.specs['Leaked Spec'], undefined)
+
+    const qs = getSuggestedQuestions(ctx)
+    assert.ok(!qs.some((q) => /upc|tax|number of reviews|availability|excluded/i.test(q)))
+  } finally {
+    restore()
+  }
 })

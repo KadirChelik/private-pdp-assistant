@@ -127,6 +127,7 @@ export interface ProductContext {
   qna?: ProductQna[]
 
   returnDays?: number
+  returnPolicyText?: string
   shippingFee?: string
 
   visibleTextSample?: string

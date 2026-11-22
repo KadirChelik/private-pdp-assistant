@@ -28,8 +28,41 @@ const clean = (value: string | null | undefined): string =>
 const compact = (value: string, max: number): string =>
   value.length <= max ? value : `${value.slice(0, max - 1).trimEnd()}…`
 
+const NAMED_HTML_ENTITIES: Record<string, string> = {
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  nbsp: ' ',
+  ndash: '–',
+  mdash: '—',
+  rsquo: '’',
+  lsquo: '‘',
+  rdquo: '”',
+  ldquo: '“',
+}
+
+function decodeHtmlEntities(value: string): string {
+  if (!value.includes('&')) return value
+  return value.replace(/&(?:#x([0-9a-f]+)|#(\d+)|([a-z]+));/gi, (full, hex, dec, named) => {
+    if (hex) {
+      const code = Number.parseInt(hex, 16)
+      return Number.isFinite(code) ? String.fromCodePoint(code) : full
+    }
+    if (dec) {
+      const code = Number.parseInt(dec, 10)
+      return Number.isFinite(code) ? String.fromCodePoint(code) : full
+    }
+    const replacement = named ? NAMED_HTML_ENTITIES[named.toLowerCase()] : undefined
+    return replacement ?? full
+  })
+}
+
 function scalar(value: unknown): string {
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return clean(String(value))
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return clean(decodeHtmlEntities(String(value)))
+  }
   return ''
 }
 
@@ -50,7 +83,12 @@ function objects(value: unknown): JsonObject[] {
 
 function isProduct(value: JsonObject): boolean {
   const type = value['@type']
-  return type === 'Product' || (Array.isArray(type) && type.includes('Product'))
+  const types = Array.isArray(type) ? type : [type]
+  if (types.includes('Product') || types.includes('ProductGroup')) return true
+  if (types.includes('Book')) {
+    return Boolean(value.offers || (value.name && (value.author || value.isbn || value.bookFormat || value.numberOfPages)))
+  }
+  return false
 }
 
 function collectProducts(value: unknown, products: JsonObject[]): void {
@@ -302,31 +340,82 @@ function jsonLdSpecs(product: JsonObject): Record<string, string> {
   return specs
 }
 
-function domSpecs(root: HTMLElement): Record<string, string> {
+const EXCLUDED_CONTAINER_SELECTOR =
+  'script,style,noscript,svg,canvas,template,nav,header,footer,[data-pdp-assistant],[data-pdp-assistant-ignore],[class*="recommend" i],[class*="similar" i],[class*="related" i],[class*="carousel" i],[class*="breadcrumb" i],[class*="menu" i]'
+
+const COLLAPSED_SPEC_CONTAINER_SELECTOR =
+  '[class*="product-info" i],[class*="dimension" i],[class*="measure" i],[class*="spec" i],[class*="attribute" i],[class*="property" i],[class*="ozellik" i],[class*="tab" i],[class*="accordion" i],[class*="collapse" i],[role="tabpanel"],#productDetails_techSpec_section_1,#productDetails_detailBullets_sections1,#detailBullets_feature_div'
+
+const SPEC_JUNK_LINE =
+  /^(?:mağazalar|giriş yap|üye ol|sepete ekle|favorilerim|daha fazla bilgi|ilgili kategoriler|kvkk|gizlilik|teslimat ve iade|ödeme seçenekleri)$/i
+
+function isInsideExcludedContainer(element: Element): boolean {
+  return Boolean(element.closest(EXCLUDED_CONTAINER_SELECTOR))
+}
+
+function isExtractableSpecElement(element: HTMLElement, allowCollapsedPanels: boolean): boolean {
+  if (isInsideExcludedContainer(element)) return false
+  if (isVisible(element)) return true
+  return allowCollapsedPanels && Boolean(element.closest(COLLAPSED_SPEC_CONTAINER_SELECTOR))
+}
+
+function specText(element: HTMLElement | null, allowCollapsedPanels: boolean): string {
+  if (!element) return ''
+  if (isVisible(element)) return clean(element.innerText || element.textContent)
+  if (allowCollapsedPanels && element.closest(COLLAPSED_SPEC_CONTAINER_SELECTOR) && !isInsideExcludedContainer(element)) {
+    return clean(element.textContent)
+  }
+  return ''
+}
+
+function domSpecs(root: ParentNode, allowCollapsedPanels = true): Record<string, string> {
   const specs: Record<string, string> = {}
   const add = (labelValue: string, detailValue: string): void => {
-    const key = compact(clean(labelValue).replace(/:\s*$/, ''), 60)
-    const value = compact(clean(detailValue), 220)
-    if (key && value && key !== value && !(key in specs)) specs[key] = value
+    const key = clean(labelValue).replace(/:\s*$/, '')
+    const value = compact(clean(detailValue), 200)
+    if (
+      !key ||
+      !value ||
+      key.length < 2 ||
+      key.length > 48 ||
+      key.split(/\s+/).length > 6 ||
+      /[!?]|\.\s*$/.test(key) ||
+      key === value ||
+      SPEC_JUNK_LINE.test(key) ||
+      SPEC_JUNK_LINE.test(value) ||
+      key in specs
+    ) {
+      return
+    }
+    specs[key] = value
   }
   for (const row of root.querySelectorAll<HTMLElement>('table tr')) {
-    if (!isVisible(row)) continue
-    const cells = Array.from(row.querySelectorAll<HTMLElement>(':scope > th, :scope > td')).map(textOf).filter(Boolean)
+    if (!isExtractableSpecElement(row, allowCollapsedPanels)) continue
+    const cells = Array.from(row.querySelectorAll<HTMLElement>(':scope > th, :scope > td'))
+      .map((cell) => specText(cell, allowCollapsedPanels))
+      .filter(Boolean)
     if (cells.length >= 2) add(cells[0], cells.slice(1).join(' · '))
   }
   for (const term of root.querySelectorAll<HTMLElement>('dl dt')) {
-    if (!isVisible(term)) continue
+    if (!isExtractableSpecElement(term, allowCollapsedPanels)) continue
     const detail = term.nextElementSibling
-    if (detail instanceof HTMLElement && detail.matches('dd')) add(textOf(term), textOf(detail))
+    if (detail instanceof HTMLElement && detail.matches('dd')) {
+      add(specText(term, allowCollapsedPanels), specText(detail, allowCollapsedPanels))
+    }
   }
   for (const item of root.querySelectorAll<HTMLElement>(
-    '[class*="spec" i] li,[data-testid*="spec"] li,[class*="detail" i] li,[class*="attribute" i] li,[class*="property" i] li,[class*="attr" i] li,[class*="spec" i] [class*="row" i]',
+    '[class*="spec" i] li,[data-testid*="spec"] li,[class*="detail" i] li,[class*="attribute" i] li,[class*="property" i] li,[class*="attr" i] li,[class*="ozellik" i] li,#detailBullets_feature_div li,[class*="attribute" i] [class*="item" i],[class*="attr" i] [class*="item" i],[class*="attributeBox" i],[class*="spec" i] [class*="item" i],[class*="spec" i] [class*="row" i],[class*="property" i] [class*="item" i],[class*="ozellik" i] [class*="item" i],[class*="dimension" i] p,[class*="measure" i] p,[class*="product-information" i] p',
   )) {
-    if (!isVisible(item)) continue
-    const children = Array.from(item.children).filter((child): child is HTMLElement => child instanceof HTMLElement).map(textOf).filter(Boolean)
-    if (children.length >= 2) add(children[0], children.slice(1).join(' · '))
-    else {
-      const match = textOf(item).match(/^([^:]{1,60}):\s*(.+)$/)
+    if (!isExtractableSpecElement(item, allowCollapsedPanels)) continue
+    const children = Array.from(item.children)
+      .filter((child): child is HTMLElement => child instanceof HTMLElement)
+      .map((child) => specText(child, allowCollapsedPanels))
+      .filter(Boolean)
+    if (children.length >= 2 && children.length <= 4) {
+      add(children[0], children.slice(1).join(' · '))
+    } else {
+      const text = specText(item, allowCollapsedPanels)
+      const match = text.match(/^([^:]{2,48}):\s*(.+)$/)
       if (match) add(match[1], match[2])
     }
   }
@@ -515,7 +604,7 @@ function fallbackVisiblePrice(root: HTMLElement): { price: string; currency: str
     if (amount === undefined) continue
     const rawCurrency = match[1] || match[4] || ''
     const currency = /₺|TL|TRY/i.test(rawCurrency) ? 'TRY' : rawCurrency
-    if (currency === 'TRY' && amount < 100) continue
+    if (currency === 'TRY' && amount < 5) continue
     const score = (/fiyat|price|satış/i.test(nearby) ? 1_000_000 : 0) + amount
     candidates.push({ amount, price: rawAmount, currency, score })
   }
@@ -524,8 +613,12 @@ function fallbackVisiblePrice(root: HTMLElement): { price: string; currency: str
 }
 
 function getOffer(product: JsonObject): JsonObject | undefined {
-  const offers = objects(product.offers)
-  return offers.find((offer) => scalar(offer.price)) || offers[0]
+  const direct = objects(product.offers)
+  const variant = firstObject(product.hasVariant)
+  const offers = direct.length ? direct : variant ? objects(variant.offers) : []
+  return offers.find((offer) =>
+    Boolean(scalar(offer.price) || scalar(offer.lowPrice) || scalar(firstObject(offer.priceSpecification)?.price)),
+  ) || offers[0]
 }
 
 function selectMainProduct(products: JsonObject[], root: HTMLElement): JsonObject | undefined {
@@ -572,6 +665,12 @@ function returnDays(product: JsonObject, offer: JsonObject | undefined): number 
   return Number.isFinite(days) ? days : undefined
 }
 
+function returnPolicyText(product: JsonObject, offer: JsonObject | undefined): string | undefined {
+  const policy = firstObject(offer?.hasMerchantReturnPolicy) || firstObject(product.hasMerchantReturnPolicy)
+  const text = scalar(policy?.description)
+  return text ? compact(text, 360) : undefined
+}
+
 function parseRating(value: unknown): number | undefined {
   const rating = Number.parseFloat(scalar(value).replace(',', '.'))
   return Number.isFinite(rating) ? rating : undefined
@@ -605,7 +704,7 @@ function visibleReviews(root: ParentNode): ProductReview[] {
   const elements = selectors.flatMap((selector) => Array.from(root.querySelectorAll<HTMLElement>(selector)))
   const seen = new Set<string>()
   for (const element of elements) {
-    if (!isVisible(element)) continue
+    if (!isVisible(element) || isInsideExcludedContainer(element)) continue
     const body = compact(firstText(element, ['[itemprop="reviewBody"]', '[class*="review-body" i]', '[class*="comment" i]', 'p']), 500)
     const key = body.toLocaleLowerCase()
     if (!body || seen.has(key)) continue
@@ -892,7 +991,7 @@ export function getSuggestedQuestions(context: ProductContext): string[] {
   }
 
   // 13. Dynamic spec questions for any remaining attributes on arbitrary websites
-  const NOISY_SPEC_KEY = /\b(?:sku|barkod|barcode|gtin|ean|mpn|isbn|kod|code|id|model\s*no|urun\s*kodu|stok\s*kodu)\b/i
+  const NOISY_SPEC_KEY = /\b(?:sku|barkod|barcode|gtin|ean|mpn|isbn|kod|code|id|model\s*no|urun\s*kodu|stok\s*kodu|upc|asin|price|fiyat|liste\s*fiyat|tax|kdv|vergi|number\s*of\s*reviews|yorum\s*sayis|availability|stok\s*durum|product\s*type|urun\s*tipi|magazalar|ilgili\s*kategoriler)\b/i
   for (const [key, rawValue] of Object.entries(specs)) {
     if (questions.length >= Math.min(5, maxBeforeReviews)) break
     if (coveredSpecKeys.has(key)) continue
@@ -905,7 +1004,7 @@ export function getSuggestedQuestions(context: ProductContext): string[] {
 
   // 14. Return / Shipping when room remains
   if (questions.length < Math.min(6, maxBeforeReviews)) {
-    if (context.returnDays) {
+    if (context.returnDays || context.returnPolicyText) {
       add(q('İade süresi kaç gün?', 'What is the return policy?'))
     } else if (context.shippingFee || /kargo|teslim|ship/i.test(context.availability || '')) {
       add(q('Kargo ve teslimat nasıl?', 'How fast does it ship?'))
@@ -937,8 +1036,12 @@ export function extractProductContext(): ProductContext {
   const dataSource: string[] = []
   if (product) dataSource.push('json-ld product')
 
-  const jsonPrice = scalar(offer?.price)
-  const jsonCurrency = scalar(offer?.priceCurrency)
+  const jsonPrice =
+    scalar(offer?.price) ||
+    scalar(offer?.lowPrice) ||
+    scalar(firstObject(offer?.priceSpecification)?.price) ||
+    scalar(offer?.highPrice)
+  const jsonCurrency = scalar(offer?.priceCurrency) || scalar(firstObject(offer?.priceSpecification)?.priceCurrency)
   let listedCurrency = jsonCurrency
   let listedPrice = jsonPrice ? formatPrice(jsonPrice, jsonCurrency) : ''
   let listedPriceSource = jsonPrice ? 'json-ld offers.price' : undefined
@@ -956,9 +1059,23 @@ export function extractProductContext(): ProductContext {
     }
   }
   if (!listedPrice) {
-    const domPrice = attributeOrText(root, ['[data-testid*="product-price"]', '[class*="product-price" i]', '[id*="product-price" i]', '[data-price]'])
+    const domPrice = attributeOrText(root, [
+      '[itemprop="price"]',
+      '[data-testid*="product-price"]',
+      '[class*="product-detail-price" i]',
+      '[class*="product-price" i]',
+      '[id*="product-price" i]',
+      '[data-price]',
+    ])
     if (domPrice) {
-      listedPrice = domPrice
+      const currencyHint =
+        metaContent(['meta[property="product:price:currency"]', 'meta[itemprop="priceCurrency"]']) ||
+        attributeOrText(document, ['[itemprop="priceCurrency"]']) ||
+        jsonCurrency
+      listedPrice = /^\d[\d.,]*$/.test(domPrice) && currencyHint
+        ? formatPrice(domPrice, currencyHint)
+        : domPrice
+      if (!listedCurrency && currencyHint) listedCurrency = currencyHint
       listedPriceSource = 'product price element'
       dataSource.push('dom product price')
     }
@@ -976,8 +1093,24 @@ export function extractProductContext(): ProductContext {
   const promotions = extractPromotions(root)
   if (basketDiscount.price) dataSource.push('visible DOM promotion')
 
-  const title = compact(scalar(product?.name) || firstText(root, ['h1[itemprop="name"]', '[data-testid*="product-title"]', 'h1', '[itemprop="name"]']), 200)
-  const descriptionSection = extractProductDescriptionSection(root)
+  const title = compact(
+    scalar(product?.name) ||
+      firstText(root, [
+        '#productTitle',
+        'h1[itemprop="name"]',
+        '[data-testid*="product-title"]',
+        '[class*="product-title" i]',
+        '[class*="product-name" i]',
+        'h1',
+        '[itemprop="name"]',
+      ]) ||
+      firstText(document, ['#productTitle', 'h1[itemprop="name"]', 'h1']) ||
+      metaContent(['meta[property="og:title"]', 'meta[name="twitter:title"]']),
+    200,
+  )
+  const descriptionSection =
+    extractProductDescriptionSection(root) ||
+    (root !== document.body ? extractProductDescriptionSection(document) : undefined)
   const descriptionText = descriptionSection
     || scalar(product?.description)
     || firstText(root, ['[itemprop="description"]', '[data-testid*="description"]', '[class*="product-description" i]', '[class~="description" i]'])
@@ -986,7 +1119,11 @@ export function extractProductContext(): ProductContext {
   const description = compact(descriptionText, 1_200)
   const parsedDescription = parseSpecsFromDescription(descriptionText)
   const jsonSpecs = product ? jsonLdSpecs(product) : {}
-  const technicalSpecs = domSpecs(root)
+  const rootSpecs = domSpecs(root, true)
+  const technicalSpecs =
+    root !== document.body && Object.keys(rootSpecs).length < 3
+      ? { ...domSpecs(document.body, true), ...rootSpecs }
+      : rootSpecs
   const specs = { ...technicalSpecs, ...jsonSpecs }
   for (const [key, value] of Object.entries(parsedDescription.descriptionSpecs)) {
     const exists = Object.keys(specs).some((current) => current.toLocaleLowerCase('tr-TR') === key.toLocaleLowerCase('tr-TR'))
@@ -1012,7 +1149,11 @@ export function extractProductContext(): ProductContext {
   const reviewCountValue = scalar(ratingObject?.reviewCount) || scalar(ratingObject?.ratingCount)
   const reviewCount = reviewCountValue ? Number(reviewCountValue) : undefined
   const rating = formatRating(ratingObject?.ratingValue)
-  const reviews = mergeReviews(jsonLdReviews(product), visibleReviews(root))
+  const domReviews = (() => {
+    const rootReviews = visibleReviews(root)
+    return rootReviews.length || root === document.body ? rootReviews : visibleReviews(document.body)
+  })()
+  const reviews = mergeReviews(jsonLdReviews(product), domReviews)
   const normalizedReviewCount = reviewCount !== undefined && Number.isFinite(reviewCount) ? reviewCount : reviews.length || undefined
   const reviewSummary = summarizeReviews(reviews, rating, normalizedReviewCount)
   const assemblyPattern = /\b(?:montaj|demonte|kurulum\w*|kurmas[ıi]|kurulmas[ıi]|assembly|assemble)\b|\bmonte\s+(?:ed|et|gel|ol|için|icin)/i
@@ -1085,6 +1226,7 @@ export function extractProductContext(): ProductContext {
     reviewSummary,
     qna,
     returnDays: product ? returnDays(product, offer) : undefined,
+    returnPolicyText: product ? returnPolicyText(product, offer) : undefined,
     shippingFee: shippingFee(offer) || undefined,
     visibleTextSample: visibleTextSample || undefined,
     visibleTextEvidence: unique(chunks, 80),
