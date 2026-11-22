@@ -217,16 +217,17 @@ async function callGemini(
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: systemPrompt }] },
           contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-          generationConfig: { temperature: 0.2, maxOutputTokens: 240 },
+          generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
         }),
         signal: controller.signal,
       })
       if (!response.ok) continue
       const data = (await response.json()) as {
-        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
+        candidates?: Array<{ content?: { parts?: Array<{ text?: string; thought?: boolean }> } }>
       }
       const text = data.candidates?.[0]?.content?.parts
-        ?.map((part) => part.text ?? '')
+        ?.filter((part) => !part.thought)
+        .map((part) => part.text ?? '')
         .join('')
         .trim()
       if (text) return cleanAnswer(text)
@@ -263,7 +264,7 @@ async function callOpenAiCompatible(
           { role: 'user', content: userPrompt },
         ],
         temperature: 0.2,
-        max_tokens: 240,
+        max_tokens: 512,
       }),
       signal: controller.signal,
     })
