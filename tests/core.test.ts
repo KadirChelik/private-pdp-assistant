@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { JSDOM } from 'jsdom'
 
 import { __resetRateLimitsForTests, handleAskRequest } from '../api/ask.ts'
-import { getSuggestedQuestions, parseSpecsFromDescription } from '../src/extractor.ts'
+import { extractProductContext, getSuggestedQuestions, parseSpecsFromDescription } from '../src/extractor.ts'
 import { buildLocalExtractiveAnswer } from '../src/fallback.ts'
 import {
   answerQuestion,
@@ -891,4 +891,330 @@ test('api/ask handleAskRequest validates schema, blocks HTML, enforces rate limi
     { clientIp: '198.51.100.99', env: {} },
   )
   assert.equal(limited.status, 429)
+})
+
+function buildShoeDemoContext(): ProductContext {
+  return {
+    url: 'https://shop.test/aerostride',
+    title: 'AeroStride Pro Koşu Ayakkabısı',
+    brand: 'AeroStride',
+    listedPrice: '3.499 TL',
+    basketPrice: '2.999 TL',
+    availability: 'In stock — 24 saat içinde kargoda',
+    description:
+      'Günlük tempo koşuları ve uzun mesafe antrenmanları için geliştirilen hafif koşu ayakkabısı. Çift yoğunluklu EVA orta taban darbe emilimi sağlarken nefes alan file saya ayağı serin tutar.',
+    specs: {
+      Taban: 'EVA orta taban + Kauçuk dış taban',
+      Kalıp: 'Tam kalıp',
+      Ağırlık: '245 g (42 numara)',
+      'Üst Yüzey': 'Nefes alan mühendislik file',
+      'Topuk Dropu': '8 mm',
+      Garanti: '2 Yıl üretici garantisi',
+    },
+    rating: '4.6',
+    reviewCount: 3,
+    reviews: [
+      { rating: 5, body: 'Çok hafif ve yastıklaması dizleri yormuyor. Tam numara aldım tam oldu.' },
+      {
+        rating: 4,
+        body: 'Nefes alan file yüzeyi yazın terletmiyor; ancak geniş taraklı ayaklarda yarım numara büyük tercih edilebilir.',
+      },
+      {
+        rating: 5,
+        body: 'Islak asfaltta kauçuk taban tutuşu gayet güven veriyor, kargo ertesi gün ulaştı.',
+      },
+    ],
+  }
+}
+
+function buildDressDemoContext(): ProductContext {
+  return {
+    url: 'https://shop.test/solis-dress',
+    title: 'Solis %100 Keten Midi Elbise',
+    brand: 'Solis Atelier',
+    listedPrice: '2.190 TL',
+    availability: 'In stock — aynı gün kargo',
+    description:
+      'Sıcak yaz günleri ve açık hava davetleri için tasarlanmış nefes alan %100 doğal keten midi elbise. İnce pamuklu iç astarı sayesinde iç göstermez ve rahat kesimiyle gün boyu konfor sunar.',
+    specs: {
+      Kumaş: '%100 Doğal Keten',
+      Kalıp: 'Rahat kesim',
+      Boy: 'Midi (118 cm)',
+      Astar: 'Pamuklu iç astar (iç göstermez)',
+      Yıkama: '30°C hassas yıkama',
+      Renk: 'Bej',
+    },
+    rating: '4.9',
+    reviewCount: 3,
+    reviews: [
+      {
+        rating: 5,
+        body: 'Yaz düğününde giydim, %100 keten olduğu için hiç terletmedi ve astarı sayesinde iç göstermiyor.',
+      },
+      {
+        rating: 5,
+        body: 'Kalıbı rahat kesim, kendi bedeninizi alabilirsiniz. Doğal keten olduğu için ilk yıkamadan sonra hafif ütü istiyor.',
+      },
+      {
+        rating: 5,
+        body: 'Bej rengi çok şık duruyor, 30 derecede hassas yıkamada çekme yapmadı.',
+      },
+    ],
+  }
+}
+
+test('getSuggestedQuestions adapts dynamically across 5 categories without furniture/assembly leaks', () => {
+  const restoreTr = installDom('<!doctype html><html lang="tr"><body><main>Ürün</main></body></html>')
+  try {
+    const shoeQuestions = getSuggestedQuestions(buildShoeDemoContext())
+    assert.ok(shoeQuestions.includes('Sepette fiyatı ne kadar?'))
+    assert.ok(shoeQuestions.includes('Kalıbı nasıl?'))
+    assert.ok(shoeQuestions.includes('Tabanı ve yastıklaması nasıl?'))
+    assert.ok(shoeQuestions.includes('Yorumlar nasıl?'))
+    assert.ok(!shoeQuestions.some((q) => /kurulum|parça|bazalı|kaç kişilik|yatak/i.test(q)))
+
+    const dressQuestions = getSuggestedQuestions(buildDressDemoContext())
+    assert.ok(dressQuestions.includes('Kalıbı nasıl?'))
+    assert.ok(dressQuestions.includes('Kumaşı nedir?'))
+    assert.ok(dressQuestions.includes('Astarı var mı, iç gösterir mi?'))
+    assert.ok(dressQuestions.includes('Nasıl yıkanır?'))
+    assert.ok(dressQuestions.includes('Boyu kaç cm?'))
+    assert.ok(dressQuestions.includes('Yorumlar nasıl?'))
+    assert.ok(!dressQuestions.some((q) => /kurulum|parça|bazalı|kaç kişilik|yatak/i.test(q)))
+
+    const sofaContext: ProductContext = {
+      url: 'https://shop.test/sofa',
+      title: 'Serra 3 Kişilik Bazalı Kanepe',
+      listedPrice: '19.990 TL',
+      descriptionText: 'Demonte gönderilir, kurulum gerektirir. Yatak ölçüsü: 190 x 110 cm. 8 adet plastik ayak.',
+      dimensionDetails: { bedSize: '190×110 cm' },
+      assemblyInfo: { requiresAssembly: true, assemblyDifficulty: 'unknown', assemblyEvidence: [], cautionNotes: [] },
+      specs: { Kapasite: '3 Kişilik', Baza: 'Var' },
+    }
+    const sofaQuestions = getSuggestedQuestions(sofaContext)
+    assert.ok(sofaQuestions.includes('Yatak ölçüsü nedir?'))
+    assert.ok(sofaQuestions.includes('Bu ürün kaç kişilik?'))
+    assert.ok(sofaQuestions.includes('Bazalı mı?'))
+    assert.ok(sofaQuestions.includes('Kurulumu zor mu?'))
+  } finally {
+    restoreTr()
+  }
+
+  // Missing <html lang> with Turkish product text + noisy words ("2 adet", "ayaküstü")
+  const restoreNoLang = installDom('<!doctype html><html><body><main>Telefon</main></body></html>')
+  try {
+    const phoneCtx: ProductContext = {
+      url: 'https://shop.test/novaphone',
+      title: 'NovaPhone Pro 256 GB',
+      listedPrice: '42.999 TL',
+      descriptionText: '2 adet arka kamera ve ayaküstü hızlı şarj desteği sunar.',
+      specs: {
+        Ekran: '6.7 inç AMOLED 120Hz',
+        'Dahili Hafıza': '256 GB',
+        Batarya: '5000 mAh',
+        Kamera: '50 MP OIS',
+        Garanti: '2 Yıl',
+      },
+      reviews: [{ rating: 5, body: 'Ekranı çok akıcı ve pil ömrü harika.' }],
+    }
+    const phoneQuestions = getSuggestedQuestions(phoneCtx)
+    assert.ok(phoneQuestions.includes('Fiyatı ne kadar?'))
+    assert.ok(phoneQuestions.includes('Ekran özellikleri nedir?'))
+    assert.ok(phoneQuestions.includes('Depolama kapasitesi ne kadar?'))
+    assert.ok(phoneQuestions.includes('Batarya özellikleri nasıl?'))
+    assert.ok(phoneQuestions.includes('Yorumlar nasıl?'))
+    assert.ok(!phoneQuestions.some((q) => /kurulum|parça|bazalı|kaç kişilik/i.test(q)))
+  } finally {
+    restoreNoLang()
+  }
+
+  // English external appliance with unrecognized spec keys
+  const restoreEn = installDom('<!doctype html><html lang="en"><body><main>Maker</main></body></html>')
+  try {
+    const coffeeCtx: ProductContext = {
+      url: 'https://shop.test/brewmaster',
+      title: 'BrewMaster Espresso Machine',
+      listedPrice: '$299',
+      specs: {
+        'Pump Pressure': '15 bar',
+        Capacity: '1.8 L',
+        'Bean Hopper': '250 g',
+      },
+    }
+    const coffeeQuestions = getSuggestedQuestions(coffeeCtx)
+    assert.ok(coffeeQuestions.includes('What is its capacity?'))
+    assert.ok(coffeeQuestions.includes('What is the pump pressure?'))
+    assert.ok(coffeeQuestions.includes('What is the bean hopper?'))
+    assert.ok(!coffeeQuestions.some((q) => /bed|assembly|storage/i.test(q)))
+  } finally {
+    restoreEn()
+  }
+})
+
+test('every suggested question is self-grounded with non-empty retrieved evidence across categories', () => {
+  const packCtx: ProductContext = {
+    url: 'https://shop.test/pack',
+    title: 'Terra Trail Pack 28L',
+    brand: 'Northwind Goods',
+    listedPrice: '129.00 USD',
+    description: 'Weather-resistant daypack built for long trails.',
+    specs: {
+      Capacity: '28 litres',
+      Weight: '980 g',
+      Material: 'Recycled ripstop nylon',
+      'Laptop sleeve': 'Up to 16 inches',
+      Warranty: 'Lifetime repairs',
+    },
+    rating: '4.8',
+    reviewCount: 3,
+    reviews: [{ rating: 5, body: 'Fits my 16-inch laptop neatly.' }],
+  }
+
+  const restoreEn = installDom('<!doctype html><html lang="en"><body><main>Pack</main></body></html>')
+  try {
+    for (const q of getSuggestedQuestions(packCtx)) {
+      const prepared = prepareQuestionEvidence(packCtx, q)
+      assert.ok(prepared.relevantEvidence.length > 0, `Expected evidence for EN pack suggestion: ${q}`)
+    }
+  } finally {
+    restoreEn()
+  }
+
+  const restoreTr = installDom('<!doctype html><html lang="tr"><body><main>TR</main></body></html>')
+  try {
+    for (const ctx of [buildShoeDemoContext(), buildDressDemoContext()]) {
+      for (const q of getSuggestedQuestions(ctx)) {
+        const prepared = prepareQuestionEvidence(ctx, q)
+        assert.ok(
+          prepared.relevantEvidence.length > 0,
+          `Expected evidence for ${ctx.title} suggestion: "${q}" (intent=${prepared.detectedIntent})`,
+        )
+      }
+    }
+  } finally {
+    restoreTr()
+  }
+})
+
+test('extractProductContext captures top-level Schema.org props and .attribute list specs', () => {
+  const restore = installDom(`<!doctype html><html lang="tr"><head>
+    <script type="application/ld+json">{
+      "@type": "Product",
+      "name": "External Shop Sneaker",
+      "color": ["Beyaz", "Lacivert"],
+      "material": { "name": "Hakiki Deri" },
+      "weight": { "@type": "QuantitativeValue", "value": "310", "unitText": "g" },
+      "offers": { "@type": "Offer", "price": "2499", "priceCurrency": "TRY" }
+    }</script>
+  </head><body><main class="product-detail">
+    <h1>External Shop Sneaker</h1>
+    <ul class="product-attributes">
+      <li><span>Taban Yüksekliği</span><span>3.5 cm</span></li>
+    </ul>
+  </main></body></html>`)
+  try {
+    const ctx = extractProductContext()
+    assert.equal(ctx.specs.Color, 'Beyaz, Lacivert')
+    assert.equal(ctx.specs.Material, 'Hakiki Deri')
+    assert.equal(ctx.specs.Weight, '310 g')
+    assert.equal(ctx.specs['Taban Yüksekliği'], '3.5 cm')
+  } finally {
+    restore()
+  }
+})
+
+test('Solis dress, AeroStride shoe, and Terra pack unscripted TR/EN questions retrieve exact evidence and reject absent ones', () => {
+  const dressCtx = buildDressDemoContext()
+  assert.equal(detectQuestionIntent('Kalıbı nasıl?'), 'fit')
+  assert.equal(detectQuestionIntent('Elbisede kalıbı nasıl?'), 'fit')
+  assert.equal(detectQuestionIntent('Ütülemesi zor mu?'), 'care')
+  assert.equal(detectQuestionIntent('Elbisenin boyu ne kadar?'), 'dimensions')
+
+  const dressFit = prepareQuestionEvidence(dressCtx, 'Elbisede kalıbı nasıl?')
+  assert.ok(dressFit.relevantEvidence.some((e) => /rahat kesim/i.test(e.value)))
+
+  const dressOwnSize = prepareQuestionEvidence(dressCtx, 'Kendi bedenimi mi almalıyım?')
+  assert.ok(dressOwnSize.relevantEvidence.some((e) => /kendi bedeninizi/i.test(e.value)))
+
+  for (const sheerQ of ['İç gösterir mi?', 'Transparan mı?', 'Astarı var mı?']) {
+    const sheer = prepareQuestionEvidence(dressCtx, sheerQ)
+    assert.ok(
+      sheer.relevantEvidence.some((e) => /astar|iç göster/i.test(`${e.label ?? ''} ${e.value}`)),
+      `Expected lining/sheer evidence for "${sheerQ}"`,
+    )
+  }
+
+  for (const careQ of ['Ütü ister mi?', 'Ütülemesi zor mu?', 'Yıkayınca çeker mi?']) {
+    const care = prepareQuestionEvidence(dressCtx, careQ)
+    assert.ok(care.relevantEvidence.length > 0, `Expected care evidence for "${careQ}"`)
+  }
+  assert.ok(
+    prepareQuestionEvidence(dressCtx, 'Ütülemesi zor mu?').relevantEvidence.some((e) => /ütü/i.test(e.value)),
+  )
+  assert.ok(
+    prepareQuestionEvidence(dressCtx, 'Yıkayınca çeker mi?').relevantEvidence.some((e) => /çekme/i.test(e.value)),
+  )
+
+  for (const lenQ of ['Boyu kaç cm?', 'Elbisenin boyu ne kadar?']) {
+    const len = prepareQuestionEvidence(dressCtx, lenQ)
+    assert.ok(len.relevantEvidence.some((e) => /118 cm/i.test(e.value)), `Expected length evidence for "${lenQ}"`)
+  }
+
+  const dressBlack = prepareQuestionEvidence(dressCtx, 'Siyah rengi var mı?')
+  assert.ok(dressBlack.relevantEvidence.some((e) => /Bej/i.test(e.value)))
+
+  for (const absentDressQ of ['Elbisede Bluetooth var mı?', 'Cebi var mı?', 'İade süresi kaç gün?']) {
+    assert.deepEqual(
+      prepareQuestionEvidence(dressCtx, absentDressQ).relevantEvidence,
+      [],
+      `Expected 0 evidence for "${absentDressQ}"`,
+    )
+  }
+
+  const shoeCtx = buildShoeDemoContext()
+  assert.notEqual(detectQuestionIntent('Topuk dropu ne kadar?'), 'price')
+  assert.ok(
+    prepareQuestionEvidence(shoeCtx, 'Kalıbı nasıl?').relevantEvidence.some((e) => /Tam kalıp/i.test(e.value)),
+  )
+  assert.ok(
+    prepareQuestionEvidence(shoeCtx, 'Kendi numaramı mı almalıyım?').relevantEvidence.some((e) => /Tam numara/i.test(e.value)),
+  )
+  assert.ok(
+    prepareQuestionEvidence(shoeCtx, 'Islak zeminde kayar mı?').relevantEvidence.some((e) => /kauçuk taban tutuşu/i.test(e.value)),
+  )
+  assert.ok(
+    prepareQuestionEvidence(shoeCtx, 'Dizleri yorar mı, yastıklaması nasıl?').relevantEvidence.some((e) => /dizleri yormuyor/i.test(e.value)),
+  )
+  assert.ok(
+    prepareQuestionEvidence(shoeCtx, 'Topuk dropu ne kadar?').relevantEvidence.some((e) => /8 mm/i.test(e.value)),
+  )
+  assert.ok(
+    prepareQuestionEvidence(shoeCtx, 'Kargo ne zaman gelir?').relevantEvidence.some((e) => /kargo/i.test(e.value)),
+  )
+  for (const absentShoeQ of ['Kırmızı rengi var mı?', 'Su geçirmez mi?']) {
+    assert.deepEqual(
+      prepareQuestionEvidence(shoeCtx, absentShoeQ).relevantEvidence,
+      [],
+      `Expected 0 evidence for shoe "${absentShoeQ}"`,
+    )
+  }
+
+  const packCtx: ProductContext = {
+    url: 'https://shop.test/pack',
+    title: 'Terra Trail Pack 28L',
+    listedPrice: '129.00 USD',
+    description: 'Ventilated back panel and contoured shoulder straps keep the load comfortable all day.',
+    specs: { Capacity: '28 litres', Weight: '980 g', 'Laptop sleeve': 'Up to 16 inches' },
+    reviews: [
+      { rating: 5, body: 'Light on the shoulders even on 18 km day hikes, and the ventilated back panel stays comfortable.' },
+      { rating: 4, body: 'Tough ripstop fabric handles wet trail conditions well. Wish it had one extra side pocket.' },
+    ],
+  }
+  assert.ok(
+    prepareQuestionEvidence(packCtx, 'Is it comfortable on long hikes?').relevantEvidence.some((e) => /18 km day hikes/i.test(e.value)),
+  )
+  assert.ok(
+    prepareQuestionEvidence(packCtx, 'Does it have side pockets?').relevantEvidence.some((e) => /side pocket/i.test(e.value)),
+  )
+  assert.deepEqual(prepareQuestionEvidence(packCtx, 'Does this backpack have Bluetooth?').relevantEvidence, [])
 })

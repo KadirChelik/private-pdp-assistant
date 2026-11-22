@@ -53,6 +53,8 @@ export type QuestionIntent =
   | 'returnPolicy'
   | 'suitability'
   | 'material'
+  | 'fit'
+  | 'care'
   | 'unknown'
 
 function isNanoDisabledForDemo(): boolean {
@@ -186,7 +188,7 @@ function normalize(value: string): string {
 }
 
 export function isTurkishText(question: string): boolean {
-  return /[çğıöşü]|\b(?:bu|ürün|urun|nedir|kaç|kac|yorum|fiyat|fiyati|rengi|renk|ölçü|olcu|bazalı|hakkında|kurulum|montaj|monte|zor|kolay|parça|ayak|paket|içinden|malzeme|ahşap|yatak|kalip|kalibi|tarakli|ayakkabi|numara|taban|keten|elbise|yikama|yikanir|astar|terletir|kumas|beden|yazlik|yazin|stok|kargo|garanti|marka|nasil)\b/i.test(
+  return /[çğıöşü]|\b(?:bu|ürün|urun|nedir|kaç|kac|yorum|fiyat|fiyati|rengi|renk|ölçü|olcu|bazalı|hakkında|kurulum|montaj|monte|zor|kolay|parça|ayak|paket|içinden|malzeme|ahşap|yatak|kalip|kalibi|kalib|kesim|tarakli|ayakkabi|numara|taban|keten|elbise|yikama|yikanir|astar|terletir|kumas|beden|bedeni|yazlik|yazin|stok|kargo|garanti|garantisi|marka|nasil|ceker|cekme|gosterir|gosteriyor|utu|kiris|kayar|tutus|yastiklama|boyu|iade|teslimat|agirligi|ozellik|batarya|ekran|kamera|hafiza|depolama|midir|mudur|var\s+mi|olur\s+mu|uygun\s+mu)\b/i.test(
     question,
   )
 }
@@ -213,6 +215,38 @@ const STOP_WORDS = new Set([
   'mü',
   'var',
   'yok',
+  'nasil',
+  'kac',
+  'hangi',
+  'neler',
+  'midir',
+  'mudur',
+  'misin',
+  'musun',
+  'acaba',
+  'olur',
+  'oluyor',
+  'yapar',
+  'eder',
+  'ister',
+  'gerekir',
+  'urunun',
+  'urunde',
+  'bunun',
+  'buna',
+  'bunu',
+  'hakkinda',
+  'sence',
+  'sizce',
+  'daha',
+  'cok',
+  'gibi',
+  'ama',
+  'fakat',
+  'ancak',
+  'gore',
+  'olan',
+  'olarak',
   'urun',
   'ürün',
   'product',
@@ -285,6 +319,100 @@ const STOP_WORDS = new Set([
   'one',
 ])
 
+const TR_STEM_SUFFIXES = [
+  'larindan',
+  'lerinden',
+  'larina',
+  'lerine',
+  'larini',
+  'lerini',
+  'lardan',
+  'lerden',
+  'sindan',
+  'sinden',
+  'sinin',
+  'sini',
+  'sina',
+  'sine',
+  'ndan',
+  'nden',
+  'lari',
+  'leri',
+  'mesi',
+  'masi',
+  'lar',
+  'ler',
+  'dan',
+  'den',
+  'tan',
+  'ten',
+  'nin',
+  'nun',
+  'siz',
+  'suz',
+  'lik',
+  'luk',
+  'lig',
+  'lug',
+  'si',
+  'su',
+  'yi',
+  'yu',
+  'ni',
+  'nu',
+  'da',
+  'de',
+  'ta',
+  'te',
+  'li',
+  'lu',
+  'ca',
+  'ce',
+  'in',
+  'un',
+  'im',
+  'um',
+  'a',
+  'e',
+  'i',
+  'u',
+] as const
+
+function addDeMutatedForms(stem: string, out: Set<string>): void {
+  if (stem.length < 3 || STOP_WORDS.has(stem)) return
+  out.add(stem)
+  if (stem === 'ceb') {
+    out.add('cep')
+    return
+  }
+  if (stem.length < 4) return
+  if (stem.endsWith('b')) out.add(`${stem.slice(0, -1)}p`)
+  else if (stem.endsWith('g')) out.add(`${stem.slice(0, -1)}k`)
+  else if (stem.endsWith('d')) out.add(`${stem.slice(0, -1)}t`)
+}
+
+function turkishStemVariants(token: string): string[] {
+  const cleanToken = normalize(token)
+  if (!cleanToken) return []
+  const variants = new Set<string>([cleanToken])
+  let current = cleanToken
+
+  for (let pass = 0; pass < 2; pass += 1) {
+    let stripped = ''
+    for (const suffix of TR_STEM_SUFFIXES) {
+      if (current.endsWith(suffix) && current.length - suffix.length >= 3) {
+        stripped = current.slice(0, -suffix.length)
+        break
+      }
+    }
+    if (!stripped || stripped === current) break
+    addDeMutatedForms(stripped, variants)
+    current = stripped
+  }
+
+  return Array.from(variants).filter((item) => item.length >= 3 && !STOP_WORDS.has(item))
+}
+
 function tokens(value: string): string[] {
   return normalize(value)
     .split(' ')
@@ -317,10 +445,18 @@ function isDimensionContext(value: string): boolean {
     /\bolcu/,
     /\bboyut/,
     /\bebat/,
+    /\bebad/,
     /\byukseklik\b/,
+    /\byukseklig/,
     /\bgenislik\b/,
+    /\bgenislig/,
     /\bderinlik\b/,
+    /\bderinlig/,
     /\buzunluk\b/,
+    /\buzunlug/,
+    /\bboy\b/,
+    /\bboyu\b/,
+    /\bboyunda\b/,
     /\bcm\b/,
     /\bsize\b/,
     /\bdimension/,
@@ -371,6 +507,20 @@ function isMaterialContext(value: string): boolean {
     /\bketen/,
     /\bpamuk/,
     /\blinen\b/,
+    /\bfile\b/,
+    /\bmesh\b/,
+    /\beva\b/,
+    /\bkaucuk/,
+    /\brubber\b/,
+    /\bderi\b/,
+    /\byun\b/,
+    /\bwool\b/,
+    /\bipek\b/,
+    /\bsilk\b/,
+    /\bviskon/,
+    /\bdenim\b/,
+    /\bcelik\b/,
+    /\bsilikon/,
   ])
 }
 
@@ -399,14 +549,13 @@ function isReviewContext(value: string): boolean {
 
 function isAssemblyContext(value: string): boolean {
   return hasAny(value, [
-    /\bkurulum\b/,
-    /\bmontaj\b/,
-    /\bmonte\b/,
+    /\bkurulum/,
+    /\bmontaj/,
+    /\bdemonte\b/,
+    /\bmonte\s+(?:ed|et|gel|ol)/,
     /\bkurmasi\b/,
     /\bkurmak\b/,
-    /\bzor mu\b/,
-    /\bkolay mi\b/,
-    /\bassembly\b/,
+    /\bassembl/,
     /\binstall/,
   ])
 }
@@ -416,6 +565,7 @@ function isPartsContext(value: string): boolean {
     /\bkac parca\b/,
     /\bparcalari\b/,
     /\bpaket icerigi\b/,
+    /\bkutu icerigi\b/,
     /\bicinden ne cikiyor\b/,
     /\bkac ayak\b/,
     /\bayaklari\b/,
@@ -431,9 +581,12 @@ function isStorageContext(value: string): boolean {
     /\bbaza\b/,
     /\bbazali\b/,
     /\bdepolama/,
+    /\bhafiza/,
+    /\bdahili hafiza\b/,
     /\bcekmece/,
     /\bstorage\b/,
     /\bdrawer\b/,
+    /\bssd\b/,
   ])
 }
 
@@ -443,9 +596,50 @@ function isDeliveryContext(value: string): boolean {
     /\bkargo/,
     /\beve teslim\b/,
     /\bmagazadan teslim\b/,
+    /\bne zaman gelir\b/,
+    /\bkac gunde\b/,
     /\bdelivery\b/,
     /\bship/,
     /\bstore pickup\b/,
+  ])
+}
+
+function isFitContext(value: string): boolean {
+  if (/\bfit\s+(?:a|an|my|in|into|up\s+to)\b/.test(value)) return false
+  return hasAny(value, [
+    /\bkalip/,
+    /\bkalib/,
+    /\bkesim/,
+    /\bbeden/,
+    /\bnumara/,
+    /\btam kalip\b/,
+    /\bdar mi\b/,
+    /\bbol mu\b/,
+    /\btrue to size\b/,
+    /\bruns small\b/,
+    /\bruns large\b/,
+    /\bsizing\b/,
+    /\bhow is the fit\b/,
+    /\bfit\b/,
+  ])
+}
+
+function isCareContext(value: string): boolean {
+  return hasAny(value, [
+    /\byika/,
+    /\byikan/,
+    /\bwash/,
+    /\butu/,
+    /\biron/,
+    /\bkiris/,
+    /\bwrinkl/,
+    /\bcekme\b/,
+    /\bceker\b/,
+    /\bshrink/,
+    /\bkurutma/,
+    /\bdry\s*clean/,
+    /\bbakim\b/,
+    /\bcare\b/,
   ])
 }
 
@@ -516,9 +710,13 @@ export function detectQuestionIntent(question: string): QuestionIntent {
   if (isDimensionContext(value)) return 'dimensions'
   if (isReturnContext(value)) return 'returnPolicy'
   if (isDeliveryContext(value)) return 'delivery'
+  if (isCareContext(value)) return 'care'
   if (isSuitabilityContext(value)) return 'suitability'
+  if (isFitContext(value)) return 'fit'
   if (isReviewContext(value)) return 'reviews'
   if (isSummaryContext(value)) return 'summary'
+
+  if (isStorageContext(value)) return 'storage'
 
   if (
     hasAny(value, [
@@ -535,7 +733,6 @@ export function detectQuestionIntent(question: string): QuestionIntent {
     return 'color'
   }
 
-  if (isStorageContext(value)) return 'storage'
   if (isMaterialContext(value)) return 'material'
 
   if (isPriceContext(value)) return 'price'
@@ -544,7 +741,41 @@ export function detectQuestionIntent(question: string): QuestionIntent {
     /\bne kadar\b/.test(value) &&
     !isDimensionContext(value) &&
     !isOpenedBedContext(value) &&
-    !hasAny(value, [/\bagirli/, /\bkilo/, /\bgram/, /\bhafif/, /\bgaranti/, /\bkargo/, /\bteslim/, /\bgun\b/, /\bkapasite/, /\blitre/, /\bsure/, /\bsaat/])
+    !hasAny(value, [
+      /\bagirli/,
+      /\bkilo/,
+      /\bgram/,
+      /\bhafif/,
+      /\bgaranti/,
+      /\bkargo/,
+      /\bteslim/,
+      /\bgun\b/,
+      /\bkapasite/,
+      /\blitre/,
+      /\bsure/,
+      /\bsaat/,
+      /\bboy\b/,
+      /\bboyu\b/,
+      /\byukseklig/,
+      /\bgenislig/,
+      /\bderinlig/,
+      /\buzunlug/,
+      /\bebad/,
+      /\bdrop/,
+      /\btopuk/,
+      /\bpil\b/,
+      /\bbatarya/,
+      /\bsarj/,
+      /\bomru/,
+      /\bekran/,
+      /\bwatt/,
+      /\bguc\b/,
+      /\bkalinli/,
+      /\bcap\b/,
+      /\bcapi\b/,
+      /\bmesafe/,
+      /\bkm\b/,
+    ])
   ) {
     return 'price'
   }
@@ -658,13 +889,13 @@ export function buildEvidenceIndex(context: ProductContext): EvidenceItem[] {
     let type: EvidenceItem['type'] = 'spec'
 
     if (
-      /yukseklik|genislik|derinlik|uzunluk|olcu|boyut|ebat|yatak|oturum|sirt|height|width|depth|size/.test(
+      /^boy$|boyu|yukseklik|genislik|derinlik|uzunluk|olcu|boyut|ebat|yatak|oturum|sirt|height|width|depth|size/.test(
         normalizedKey,
       )
     ) {
       type = 'dimension'
     } else if (
-      /malzeme|materyal|kumas|metal|ahsap|mdf|sunta|yay|sunger|material|fabric/.test(
+      /malzeme|materyal|kumas|metal|ahsap|mdf|sunta|yay|sunger|material|fabric|ust\s*yuzey|upper/.test(
         normalizedKey,
       )
     ) {
@@ -894,9 +1125,26 @@ export function buildEvidenceIndex(context: ProductContext): EvidenceItem[] {
   return dedupeEvidence(items)
 }
 
-function expandedQuestionTerms(question: string, intent: QuestionIntent): string[] {
+function expandedQuestionTerms(
+  question: string,
+  intent: QuestionIntent,
+  titleTokens?: ReadonlySet<string>,
+): string[] {
   const value = normalize(question)
-  const terms = new Set(tokens(question))
+  const rawTokens = tokens(question)
+  const filteredTokens =
+    intent === 'unknown' && titleTokens && titleTokens.size > 0
+      ? rawTokens.filter(
+          (token) => !turkishStemVariants(token).some((variant) => titleTokens.has(variant)),
+        )
+      : rawTokens
+  const activeTokens = filteredTokens.length > 0 ? filteredTokens : rawTokens
+  const terms = new Set<string>()
+  for (const token of activeTokens) {
+    for (const variant of turkishStemVariants(token)) {
+      terms.add(variant)
+    }
+  }
 
   if (intent === 'material' || /ahsap|wood|malzeme|materyal|made of|made from/.test(value)) {
     ;[
@@ -924,6 +1172,25 @@ function expandedQuestionTerms(question: string, intent: QuestionIntent): string
       'steel',
       'aluminum',
       'plastic',
+      'keten',
+      'pamuk',
+      'linen',
+      'file',
+      'mesh',
+      'eva',
+      'kaucuk',
+      'rubber',
+      'deri',
+      'yun',
+      'wool',
+      'ipek',
+      'silk',
+      'viskon',
+      'denim',
+      'celik',
+      'silikon',
+      'ust',
+      'yuzey',
     ].forEach((term) => terms.add(term))
   }
 
@@ -953,11 +1220,18 @@ function expandedQuestionTerms(question: string, intent: QuestionIntent): string
       'genislik',
       'derinlik',
       'uzunluk',
+      'boy',
+      'boyu',
+      'cm',
       'height',
       'width',
       'depth',
       'size',
     ].forEach((term) => terms.add(term))
+  }
+
+  if (intent === 'color') {
+    ;['renk', 'rengi', 'color', 'colour'].forEach((term) => terms.add(term))
   }
 
   if (intent === 'assembly') {
@@ -1000,10 +1274,14 @@ function expandedQuestionTerms(question: string, intent: QuestionIntent): string
       'baza',
       'bazali',
       'depolama',
+      'hafiza',
       'cekmece',
       'cekmeceli',
       'storage',
       'drawer',
+      'ssd',
+      'gb',
+      'tb',
     ].forEach((term) => terms.add(term))
   }
 
@@ -1067,8 +1345,8 @@ function expandedQuestionTerms(question: string, intent: QuestionIntent): string
     ;['weight', 'agirlik', 'light', 'gram', 'kg'].forEach((term) => terms.add(term))
   }
 
-  if (/who makes|maker|manufacturer|marka|brand/.test(value)) {
-    ;['brand', 'marka'].forEach((term) => terms.add(term))
+  if (/who makes|maker|manufacturer|marka|brand|uretici/.test(value)) {
+    ;['brand', 'marka', 'uretici'].forEach((term) => terms.add(term))
   }
 
   if (
@@ -1096,27 +1374,55 @@ function expandedQuestionTerms(question: string, intent: QuestionIntent): string
   }
 
   if (/pocket|compartment|cep|bolme/.test(value)) {
-    ;['pocket', 'sleeve', 'compartment'].forEach((term) => terms.add(term))
+    ;['pocket', 'compartment', 'cep', 'bolme'].forEach((term) => terms.add(term))
+    if (/compartment|bolme|laptop/.test(value)) terms.add('sleeve')
   }
 
   if (/iade|geri gonder|return|refund/.test(value)) {
     ;['return', 'returns', 'return window', 'refund', 'iade'].forEach((term) => terms.add(term))
   }
 
-  if (/kalip|fit|beden|numara|size|tarakli|genis|wide/.test(value)) {
-    ;['kalip', 'fit', 'numara', 'beden', 'size', 'genis', 'tarakli', 'review'].forEach((term) => terms.add(term))
+  if (
+    (/kalip|kalib|kesim|fit|beden|numara|tarakli|dar mi|bol mu/.test(value) &&
+      !/\bfit\s+(?:a|an|my|in|into|up\s+to)\b/.test(value))
+  ) {
+    ;['kalip', 'kalib', 'kesim', 'beden', 'numara', 'tarakli', 'fit'].forEach((term) => terms.add(term))
   }
 
   if (/taban|sole|yastiklama|cushion|drop/.test(value)) {
     ;['taban', 'sole', 'eva', 'kaucuk', 'drop', 'yastiklama'].forEach((term) => terms.add(term))
   }
 
+  if (/ic goster|transparan|seffaf|astar|lining|see.?through|sheer|opaque/.test(value)) {
+    ;['astar', 'goster', 'gostermez', 'gostermiyor', 'pamuklu', 'lining', 'sheer'].forEach((term) => terms.add(term))
+  }
+
   if (/terlet|nefes|breathab|yaz|summer|serin|keten|pamuk|linen|astar|lining/.test(value)) {
     ;['keten', 'linen', 'pamuk', 'pamuklu', 'astar', 'nefes', 'breathable', 'terlet', 'kumas'].forEach((term) => terms.add(term))
   }
 
-  if (/yika|wash|utu|iron|temizl|care/.test(value)) {
-    ;['yikama', 'wash', 'hassas', 'bakim', 'care'].forEach((term) => terms.add(term))
+  if (/yika|yikan|wash|utu|iron|kiris|wrinkl|cekme|ceker|shrink|temizl|care|bakim/.test(value)) {
+    ;['yikama', 'yikan', 'wash', 'hassas', 'derece', 'cekme', 'shrink', 'utu', 'iron', 'bakim', 'care'].forEach((term) => terms.add(term))
+  }
+
+  if (/kayar|kayma|tutus|tutun|zemin|asfalt|islak|slip|grip|traction/.test(value)) {
+    ;['taban', 'kaucuk', 'tutus', 'islak', 'asfalt', 'grip', 'traction', 'sole', 'wet'].forEach((term) => terms.add(term))
+  }
+
+  if (/diz|yastikla|darbe|emilim|yorar|yormuyor|konfor|rahat|cushion|comfort|impact|shoulder|omuz/.test(value)) {
+    ;['yastiklama', 'darbe', 'emilim', 'eva', 'diz', 'konfor', 'rahat', 'comfortable', 'straps', 'shoulders', 'cushion'].forEach((term) => terms.add(term))
+  }
+
+  if (/batarya|pil|sarj|battery|charging|mah/.test(value)) {
+    ;['batarya', 'pil', 'sarj', 'battery', 'mah', 'watt'].forEach((term) => terms.add(term))
+  }
+
+  if (/ekran|cozunurluk|display|screen|oled|amoled|lcd/.test(value)) {
+    ;['ekran', 'display', 'screen', 'hz', 'oled', 'amoled', 'cozunurluk'].forEach((term) => terms.add(term))
+  }
+
+  if (/kamera|camera|lens|megapiksel/.test(value)) {
+    ;['kamera', 'camera', 'mp', 'lens'].forEach((term) => terms.add(term))
   }
 
   return Array.from(terms)
@@ -1135,6 +1441,10 @@ function preferredTypesForIntent(intent: QuestionIntent): EvidenceItem['type'][]
       return ['spec', 'descriptionSpec', 'descriptionSentence', 'title']
     case 'storage':
       return ['spec', 'descriptionSpec', 'descriptionSentence', 'title']
+    case 'fit':
+      return ['spec', 'descriptionSpec', 'descriptionSentence', 'review', 'feature', 'qna']
+    case 'care':
+      return ['spec', 'descriptionSpec', 'descriptionSentence', 'material', 'review', 'feature', 'qna']
     case 'reviews':
       return ['review', 'rating']
     case 'summary':
@@ -1159,7 +1469,7 @@ function preferredTypesForIntent(intent: QuestionIntent): EvidenceItem['type'][]
     case 'parts':
       return ['part', 'assembly', 'descriptionSentence', 'descriptionSpec', 'spec']
     case 'delivery':
-      return ['shipping', 'availability', 'descriptionSentence', 'qna', 'spec']
+      return ['shipping', 'availability', 'descriptionSentence', 'review', 'qna', 'spec']
     case 'returnPolicy':
       return ['returnPolicy', 'qna', 'descriptionSentence']
     case 'suitability':
@@ -1181,6 +1491,15 @@ function preferredTypesForIntent(intent: QuestionIntent): EvidenceItem['type'][]
   }
 }
 
+const STRICT_SPEC_ONLY_INTENTS: ReadonlySet<QuestionIntent> = new Set([
+  'price',
+  'dimensions',
+  'openedBedDimensions',
+  'storage',
+  'capacity',
+  'returnPolicy',
+])
+
 function shouldSuppressEvidence(
   question: string,
   intent: QuestionIntent,
@@ -1196,13 +1515,11 @@ function shouldSuppressEvidence(
     return true
   }
 
-  if (
-    (item.type === 'review' || item.type === 'rating') &&
-    intent !== 'reviews' &&
-    intent !== 'summary' &&
-    intent !== 'assembly' &&
-    intent !== 'suitability'
-  ) {
+  if (item.type === 'rating' && intent !== 'reviews' && intent !== 'summary') {
+    return true
+  }
+
+  if (item.type === 'review' && STRICT_SPEC_ONLY_INTENTS.has(intent)) {
     return true
   }
 
@@ -1229,9 +1546,16 @@ const SPECIFIC_ATTRIBUTE_INTENTS: ReadonlySet<QuestionIntent> = new Set([
   'delivery',
   'returnPolicy',
   'openedBedDimensions',
+  'fit',
+  'care',
 ])
 
-function scoreEvidence(question: string, item: EvidenceItem, intent: QuestionIntent): number {
+function scoreEvidence(
+  question: string,
+  item: EvidenceItem,
+  intent: QuestionIntent,
+  titleTokens?: ReadonlySet<string>,
+): number {
   if (shouldSuppressEvidence(question, intent, item)) return -1
 
   const preferredTypes = preferredTypesForIntent(intent)
@@ -1239,16 +1563,29 @@ function scoreEvidence(question: string, item: EvidenceItem, intent: QuestionInt
   const labelText = normalize(item.label || '')
   const valueText = normalize(item.value)
   const questionText = normalize(question)
-  const questionTerms = expandedQuestionTerms(question, intent)
+  const questionTerms = expandedQuestionTerms(question, intent, titleTokens)
 
   let score = 0
 
   if (labelText && questionText.includes(labelText)) score += 35
   if (valueText && questionText.includes(valueText)) score += 18
 
+  const wordMap = new Map<string, string[]>()
+  const wordsFor = (target: string): string[] => {
+    let words = wordMap.get(target)
+    if (!words) {
+      words = target ? target.split(/\s+/) : []
+      wordMap.set(target, words)
+    }
+    return words
+  }
+
   const hasTerm = (target: string, term: string): boolean => {
     if (!target) return false
-    if (term.length <= 3) return target.split(/\s+/).includes(term)
+    if (term.length <= 3) return wordsFor(target).includes(term)
+    if (term.length === 4) {
+      return wordsFor(target).some((word) => word === term || word.startsWith(term))
+    }
     return target.includes(term)
   }
 
@@ -1271,7 +1608,7 @@ function scoreEvidence(question: string, item: EvidenceItem, intent: QuestionInt
 
   if (intent === 'dimensions') {
     if (
-      /yukseklik|genislik|derinlik|uzunluk|olcu|boyut|ebat|height|width|depth|size/.test(
+      /\bboy\b|\bboyu\b|yukseklik|yukseklig|genislik|genislig|derinlik|derinlig|uzunluk|uzunlug|olcu|boyut|ebat|ebad|\bcm\b|\bmm\b|height|width|depth|size/.test(
         combined,
       )
     ) {
@@ -1280,12 +1617,12 @@ function scoreEvidence(question: string, item: EvidenceItem, intent: QuestionInt
   }
 
   if (intent === 'capacity' && /kapasite|kisilik|oturma|capacity/.test(combined)) score += 35
-  if (intent === 'color' && /renk|color|colour/.test(combined)) score += 35
-  if (intent === 'storage' && /baza|bazali|depolama|cekmece|storage|drawer/.test(combined)) score += 38
+  if (intent === 'color' && /renk|reng|color|colour/.test(combined)) score += 35
+  if (intent === 'storage' && /baza|bazali|depolama|hafiza|cekmece|storage|drawer|ssd/.test(combined)) score += 38
 
   if (intent === 'material') {
     if (
-      /malzeme|materyal|kumas|metal|ahsap|mdf|sunta|profil|yay|sunger|kasa|taban|iskelet|material|fabric|wood|nylon|ripstop|leather|cotton|polyester|steel|aluminum|plastic/.test(
+      /malzeme|materyal|kumas|metal|ahsap|mdf|sunta|profil|yay|sunger|kasa|taban|iskelet|material|fabric|wood|nylon|ripstop|leather|cotton|polyester|steel|aluminum|plastic|keten|pamuk|linen|file|mesh|eva|kaucuk|rubber|deri|yun|wool|ipek|silk|viskon|denim|celik|silikon/.test(
         combined,
       )
     ) {
@@ -1293,9 +1630,17 @@ function scoreEvidence(question: string, item: EvidenceItem, intent: QuestionInt
     }
   }
 
+  if (intent === 'fit') {
+    if (/kalip|kalib|kesim|beden|numara|tarakli|fit/.test(combined)) score += 30
+  }
+
+  if (intent === 'care') {
+    if (/yikama|yikan|wash|hassas|cekme|shrink|utu|iron|bakim|care/.test(combined)) score += 30
+  }
+
   if (intent === 'assembly') {
     if (
-      /montaj|monte|kurulum|kurmak|zor|kolay|ayak|vida|parca|assembly|install/.test(
+      /montaj|demonte|kurulum|kurmak|assembly|install/.test(
         combined,
       )
     ) {
@@ -1315,6 +1660,10 @@ function scoreEvidence(question: string, item: EvidenceItem, intent: QuestionInt
 
   if (intent === 'returnPolicy' && /iade|return|refund/.test(combined)) {
     score += 38
+  }
+
+  if (/who makes|maker|manufacturer|marka|brand|uretici/.test(questionText) && item.type === 'brand') {
+    score += 30
   }
 
   if (/dayanikli|durable|saglam|kaliteli/.test(questionText)) {
@@ -1345,7 +1694,7 @@ function scoreEvidence(question: string, item: EvidenceItem, intent: QuestionInt
     }
   }
 
-  // Specific-attribute intents (color, storage, capacity, delivery, bed size) must
+  // Specific-attribute intents (color, storage, capacity, delivery, fit, care, bed size) must
   // match lexically or via domain pattern before earning a preferred-type boost,
   // preventing unrelated specs from passing as false positives.
   if (
@@ -1362,16 +1711,21 @@ function scoreEvidence(question: string, item: EvidenceItem, intent: QuestionInt
 export function retrieveEvidence(
   question: string,
   evidenceIndex: EvidenceItem[],
+  productTitle?: string,
 ): EvidenceItem[] {
   const cleanQuestion = clean(question)
   if (!cleanQuestion) return []
 
   const intent = detectQuestionIntent(cleanQuestion)
+  const resolvedTitle = productTitle ?? evidenceIndex.find((item) => item.type === 'title')?.value
+  const titleTokens = resolvedTitle
+    ? new Set(tokens(resolvedTitle).flatMap((token) => turkishStemVariants(token)))
+    : undefined
 
   const scored = evidenceIndex
     .map((item) => ({
       ...item,
-      score: scoreEvidence(cleanQuestion, item, intent),
+      score: scoreEvidence(cleanQuestion, item, intent, titleTokens),
     }))
     .filter((item) => (item.score ?? 0) > 0)
     .sort((a, b) => {
@@ -1461,6 +1815,8 @@ const INTENT_SUMMARY_TYPES = new Set<QuestionIntent>([
   'suitability',
   'assembly',
   'parts',
+  'fit',
+  'care',
 ])
 
 function capEvidenceChars(items: EvidenceItem[], maxChars = MAX_PROMPT_EVIDENCE_CHARS): EvidenceItem[] {
@@ -1641,7 +1997,7 @@ export function prepareQuestionEvidence(
 
   const detectedIntent = detectQuestionIntent(cleanQuestion)
   const evidenceIndex = buildEvidenceIndex(productContext)
-  const retrievedEvidence = retrieveEvidence(cleanQuestion, evidenceIndex)
+  const retrievedEvidence = retrieveEvidence(cleanQuestion, evidenceIndex, productContext.title)
   const rawCandidates = retrievedEvidence.length
     ? retrievedEvidence
     : (detectedIntent === 'summary' || detectedIntent === 'suitability')

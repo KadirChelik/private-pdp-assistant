@@ -8,7 +8,7 @@ const REVIEW_THEME_KEYWORDS = {
   delivery: ['teslim', 'teslimat', 'kapı', 'kata', 'kargo'],
   packaging: ['ambalaj', 'paket', 'tertemiz', 'özenli'],
   usability: ['kullanışlı', 'rahat', 'f/p', 'memnun', 'kaliteli'],
-  assembly: ['montaj', 'monte', 'kurulum'],
+  assembly: ['montaj', 'demonte', 'kurulum'],
 } as const
 const PRICE_NOISE = /kupon|coupon|kargo|cargo|shipping|taksit|installment|indirim|discount|puan|points|montaj|service|hizmet|kampanya|delivery\s*fee/i
 const PRODUCT_ROOT_SELECTORS = [
@@ -258,13 +258,47 @@ function visibleProductImage(root: HTMLElement): string {
   return ''
 }
 
+function jsonLdPropertyValue(raw: unknown): string {
+  if (Array.isArray(raw)) {
+    return unique(raw.map(jsonLdPropertyValue).filter(Boolean)).join(', ')
+  }
+  const obj = object(raw)
+  if (!obj) return scalar(raw)
+  const quant = [scalar(obj.value), scalar(obj.unitText || obj.unitCode)].filter(Boolean).join(' ')
+  return namedValue(raw) || quant
+}
+
 function jsonLdSpecs(product: JsonObject): Record<string, string> {
   const specs: Record<string, string> = {}
+  const addSpec = (key: string, value: string): void => {
+    const cleanKey = compact(clean(key), 60)
+    const cleanValue = compact(clean(value), 220)
+    if (!cleanKey || !cleanValue) return
+    const exists = Object.keys(specs).some(
+      (existing) => existing.toLocaleLowerCase('tr-TR') === cleanKey.toLocaleLowerCase('tr-TR'),
+    )
+    if (!exists) specs[cleanKey] = cleanValue
+  }
+
   for (const prop of objects(product.additionalProperty)) {
     const key = scalar(prop.name)
     const value = scalar(prop.value) || scalar(prop.unitText)
-    if (key && value && !(key in specs)) specs[key] = value
+    addSpec(key, value)
   }
+
+  const topLevelFields: Array<[string, string]> = [
+    ['color', 'Color'],
+    ['material', 'Material'],
+    ['size', 'Size'],
+    ['weight', 'Weight'],
+    ['width', 'Width'],
+    ['height', 'Height'],
+    ['depth', 'Depth'],
+  ]
+  for (const [field, label] of topLevelFields) {
+    addSpec(label, jsonLdPropertyValue(product[field]))
+  }
+
   return specs
 }
 
@@ -281,10 +315,14 @@ function domSpecs(root: HTMLElement): Record<string, string> {
     if (cells.length >= 2) add(cells[0], cells.slice(1).join(' · '))
   }
   for (const term of root.querySelectorAll<HTMLElement>('dl dt')) {
+    if (!isVisible(term)) continue
     const detail = term.nextElementSibling
     if (detail instanceof HTMLElement && detail.matches('dd')) add(textOf(term), textOf(detail))
   }
-  for (const item of root.querySelectorAll<HTMLElement>('[class*="spec" i] li,[data-testid*="spec"] li,[class*="detail" i] li')) {
+  for (const item of root.querySelectorAll<HTMLElement>(
+    '[class*="spec" i] li,[data-testid*="spec"] li,[class*="detail" i] li,[class*="attribute" i] li,[class*="property" i] li,[class*="attr" i] li,[class*="spec" i] [class*="row" i]',
+  )) {
+    if (!isVisible(item)) continue
     const children = Array.from(item.children).filter((child): child is HTMLElement => child instanceof HTMLElement).map(textOf).filter(Boolean)
     if (children.length >= 2) add(children[0], children.slice(1).join(' · '))
     else {
@@ -658,87 +696,234 @@ function normalizeKey(value: string): string {
     .replace(/[\u0300-\u036f]/g, '')
 }
 
-function hasSpecLike(specs: Record<string, string>, patterns: RegExp[]): boolean {
-  return Object.entries(specs).some(([key, value]) => {
-    const text = normalizeKey(`${key} ${value}`)
-    return patterns.some((pattern) => pattern.test(text))
-  })
+export function detectContextTurkish(context: ProductContext): boolean {
+  if (typeof document !== 'undefined' && document.documentElement.lang.toLocaleLowerCase().startsWith('tr')) {
+    return true
+  }
+  const sample = [
+    context.title,
+    context.listedPrice,
+    context.basketPrice,
+    context.description,
+    ...Object.entries(context.specs || {}).flat(),
+  ]
+    .filter((value): value is string => Boolean(value))
+    .join(' ')
+
+  return /[çğıöşüÇĞİÖŞÜ]|\bTL\b|₺|\b(?:fiyat|kalip|kumas|taban|yikama|garanti|kargo|renk|olcu|beden|ayakkabi|elbise|kanepe|yorum|urun|ozellik|stokta|sepette)\b/i.test(
+    sample,
+  )
 }
 
 export function getSuggestedQuestions(context: ProductContext): string[] {
   const MAX_SUGGESTED_QUESTIONS = 8
   const questions: string[] = []
   const specs = context.specs || {}
-  const pageLanguage = typeof document === 'undefined' ? '' : document.documentElement.lang
-  const isTurkishPage = pageLanguage.toLocaleLowerCase().startsWith('tr')
-  const q = (turkish: string, english: string): string => isTurkishPage ? turkish : english
+  const isTurkishPage = detectContextTurkish(context)
+  const hasReviews = Boolean(context.reviews?.length || context.reviewCount)
+  const maxBeforeReviews = hasReviews ? MAX_SUGGESTED_QUESTIONS - 1 : MAX_SUGGESTED_QUESTIONS
+  const coveredSpecKeys = new Set<string>()
+  const q = (turkish: string, english: string): string => (isTurkishPage ? turkish : english)
 
-  const add = (question: string): void => {
-    if (!questions.includes(question) && questions.length < MAX_SUGGESTED_QUESTIONS) {
+  const add = (question: string, limit = maxBeforeReviews): void => {
+    if (!questions.includes(question) && questions.length < limit) {
       questions.push(question)
     }
   }
 
+  const findSpecKey = (
+    keyPatterns: RegExp[],
+    valuePatterns?: RegExp[],
+  ): string | undefined => {
+    for (const [key, value] of Object.entries(specs)) {
+      const normKey = normalizeKey(key)
+      const normValue = normalizeKey(value)
+      if (!keyPatterns.some((pattern) => pattern.test(normKey))) continue
+      if (valuePatterns && !valuePatterns.some((pattern) => pattern.test(normValue))) continue
+      coveredSpecKeys.add(key)
+      return key
+    }
+    return undefined
+  }
+
+  const findSpecByKeyOrValue = (
+    keyPatterns: RegExp[],
+    valuePatterns: RegExp[],
+  ): string | undefined => {
+    for (const [key, value] of Object.entries(specs)) {
+      const normKey = normalizeKey(key)
+      const normValue = normalizeKey(value)
+      if (
+        keyPatterns.some((pattern) => pattern.test(normKey)) ||
+        valuePatterns.some((pattern) => pattern.test(normValue))
+      ) {
+        coveredSpecKeys.add(key)
+        return key
+      }
+    }
+    return undefined
+  }
+
+  // 1. Price
   if (context.basketPrice) add(q('Sepette fiyatı ne kadar?', 'What is the basket price?'))
   else if (context.listedPrice || context.price) add(q('Fiyatı ne kadar?', 'What is the price?'))
 
+  // 2. Fit / Kalıp
+  if (findSpecKey([/\b(?:kalip|kalib|fit|kesim)\b/])) {
+    add(q('Kalıbı nasıl?', 'How is the fit?'))
+  }
+
+  // 3. Material / Fabric
+  const hasMaterialBuild =
+    Object.values(context.materialsAndBuild || {}).some(Boolean) ||
+    Boolean(context.comfortAndBuildFacts?.length)
+  const materialKey = findSpecKey([
+    /\b(?:malzeme|materyal|kumas|material|fabric|ust\s*yuzey|upper)\b/,
+  ])
+  if (hasMaterialBuild || materialKey) {
+    const isFabricSpec = Boolean(materialKey && /\bkumas\b/.test(normalizeKey(materialKey)))
+    add(isTurkishPage && isFabricSpec ? 'Kumaşı nedir?' : q('Malzemesi nedir?', 'What is it made of?'))
+  }
+
+  // 4. Lining / Sheerness
+  if (findSpecByKeyOrValue([/\b(?:astar|lining)\b/], [/\b(?:ic\s*goster|sheer|lining|astar)\b/])) {
+    add(q('Astarı var mı, iç gösterir mi?', 'Is it lined or see-through?'))
+  }
+
+  // 5. Care / Washing
+  if (findSpecKey([/\b(?:yikama|bakim|wash|care)\b/])) {
+    add(q('Nasıl yıkanır?', 'How should it be washed?'))
+  }
+
+  // 6. Sole / Cushioning
+  if (findSpecKey([/\b(?:taban|sole)\b/])) {
+    add(q('Tabanı ve yastıklaması nasıl?', 'What is the sole like?'))
+  }
+
+  // 7. Bed dimensions (furniture sofabeds only)
   if (
     context.dimensionDetails?.bedSize ||
-    hasSpecLike(specs, [/yatak.*olcu/, /yatak.*boyut/, /bed.*size/])
+    findSpecKey([/yatak.*(?:olcu|boyut)/, /bed.*size/])
   ) {
     add(q('Yatak ölçüsü nedir?', 'What are the bed dimensions?'))
   }
 
+  // 8. Dimensions or apparel length
+  const dimSpecKey = findSpecKey([
+    /\b(?:yukseklik|genislik|derinlik|uzunluk|olcu|ebat|boyut|height|width|depth|dimension)\b/,
+  ])
   if (
     context.dimensionDetails?.height ||
     context.dimensionDetails?.width ||
     context.dimensionDetails?.depth ||
-    hasSpecLike(specs, [/yukseklik/, /genislik/, /derinlik/, /olcu/, /ebat/, /boyut/, /height/, /width/, /depth/, /dimension/, /size/])
+    dimSpecKey
   ) {
     add(q('Ölçüleri nedir?', 'What are the dimensions?'))
+  } else if (findSpecKey([/^boy$/, /\b(?:elbise\s*boy|urun\s*boy|length)\b/])) {
+    add(q('Boyu kaç cm?', 'What is the length?'))
   }
 
-  if (hasSpecLike(specs, [/renk/, /color/])) {
+  // 9. Capacity (distinguish furniture seating vs bags/bottles/electronics)
+  const capKey = findSpecKey([/\b(?:kapasite|kisilik|oturma|capacity|hacim|volume)\b/])
+  if (capKey) {
+    const capCombined = normalizeKey(`${capKey} ${specs[capKey] ?? ''}`)
+    const isSeating = /kisilik|oturma|person|seat/.test(capCombined)
+    add(
+      isSeating
+        ? q('Bu ürün kaç kişilik?', 'What is the seating capacity?')
+        : q('Kapasitesi ne kadar?', 'What is its capacity?'),
+    )
+  }
+
+  // 10. Storage / Baza (furniture baza vs digital storage)
+  const furnitureContext = /\b(?:kanepe|koltuk|yatak|baza|berjer|sofa|couch|bed|ottoman|furniture)\b/.test(
+    normalizeKey(`${context.title ?? ''} ${context.category ?? ''} ${context.description ?? ''}`),
+  )
+  const bazaKey = findSpecByKeyOrValue(
+    [/\b(?:baza|bazali)\b/],
+    [/\b(?:baza|bazali)\b/],
+  ) || findSpecKey([/\bstorage\b/], [/\b(?:under-?bed|sofa|drawer|baza|compartment)\b/])
+  if (bazaKey || (furnitureContext && findSpecKey([/\b(?:baza|depolama|storage)\b/]))) {
+    add(q('Bazalı mı?', 'Does it include storage?'))
+  } else if (
+    findSpecKey(
+      [/\b(?:depolama|hafiza|dahili\s*hafiza|storage|ssd)\b/],
+      [/\b(?:gb|tb|mb|ssd|nvme|hdd)\b/],
+    )
+  ) {
+    add(q('Depolama kapasitesi ne kadar?', 'What is the storage capacity?'))
+  }
+
+  // 11. Common cross-category attributes
+  if (findSpecKey([/\b(?:laptop|bilgisayar|notebook)\b/])) {
+    add(q('Kaç inç laptop sığar?', 'What laptop size fits?'))
+  }
+  if (findSpecKey([/\b(?:ekran|display|screen)\b/])) {
+    add(q('Ekran özellikleri nedir?', 'What are the display specs?'))
+  }
+  if (findSpecKey([/\b(?:batarya|pil|battery)\b/])) {
+    add(q('Batarya özellikleri nasıl?', 'How is the battery life?'))
+  }
+  if (findSpecKey([/\b(?:agirlik|weight)\b/])) {
+    add(q('Ağırlığı ne kadar?', 'How heavy is it?'))
+  }
+  if (findSpecKey([/\b(?:renk|colou?r)\b/])) {
     add(q('Rengi nedir?', 'What color is it?'))
   }
-
-  if (hasSpecLike(specs, [/kapasite/, /kisilik/, /oturma/, /capacity/])) {
-    add(q('Bu ürün kaç kişilik?', 'What is its capacity?'))
+  if (findSpecKey([/\b(?:garanti|warranty)\b/])) {
+    add(q('Garanti süresi nedir?', 'What is the warranty?'))
   }
 
-  if (hasSpecLike(specs, [/baza/, /bazali/, /depolama/, /storage/])) {
-    add(q('Bazalı mı?', 'Does it include storage?'))
-  }
-
+  // 12. Assembly & parts (strictly gated — never triggered by unrelated shoe/apparel words)
   if (
-    context.materialsAndBuild ||
-    context.comfortAndBuildFacts?.length ||
-    hasSpecLike(specs, [/malzeme/, /materyal/, /kumas/, /metal/, /ahsap/, /mdf/, /sunta/, /material/, /fabric/, /wood/, /nylon/])
-  ) {
-    add(q('Malzemesi nedir?', 'What is it made of?'))
-  }
-
-  if (
-    context.assemblyInfo?.assemblyEvidence?.length ||
-    context.partsInfo?.knownParts?.length ||
-    context.descriptionText?.match(/montaj|monte|kurulum|ayak|parça|vida/i)
+    context.assemblyInfo?.requiresAssembly !== undefined ||
+    Boolean(context.assemblyInfo?.assemblyEvidence?.length) ||
+    Boolean(findSpecKey([/\b(?:kurulum|montaj|demonte|assembly)\b/]))
   ) {
     add(q('Kurulumu zor mu?', 'Does it require assembly?'))
   }
 
   if (
-    context.partsInfo?.knownParts?.length ||
-    context.descriptionText?.match(/adet|parça|ayak|vida|paket içeriği/i)
+    Boolean(context.partsInfo?.exactPackagePieceCount) ||
+    (context.partsInfo?.knownParts?.length ?? 0) >= 2 ||
+    Boolean(findSpecKey([/\b(?:paket\s*icerig|kutu\s*icerig|in\s*the\s*box|package\s*contents)\b/]))
   ) {
-    add(q('Kaç parça geliyor?', 'What parts are included?'))
+    add(q('Paket içeriğinde neler var?', 'What is included in the box?'))
   }
 
-  if (context.reviews?.length || context.reviewCount) {
-    add(q('Yorumlar nasıl?', 'How are the reviews?'))
-    add(q('Yorumlarda öne çıkanlar neler?', 'What do customer reviews highlight?'))
+  // 13. Dynamic spec questions for any remaining attributes on arbitrary websites
+  const NOISY_SPEC_KEY = /\b(?:sku|barkod|barcode|gtin|ean|mpn|isbn|kod|code|id|model\s*no|urun\s*kodu|stok\s*kodu)\b/i
+  for (const [key, rawValue] of Object.entries(specs)) {
+    if (questions.length >= Math.min(5, maxBeforeReviews)) break
+    if (coveredSpecKeys.has(key)) continue
+    const cleanKey = clean(key)
+    if (!clean(rawValue) || cleanKey.length < 3 || cleanKey.length > 26) continue
+    if (NOISY_SPEC_KEY.test(normalizeKey(cleanKey))) continue
+    coveredSpecKeys.add(cleanKey)
+    add(isTurkishPage ? `${cleanKey} nedir?` : `What is the ${cleanKey.toLocaleLowerCase()}?`)
   }
 
-  add(q('Satın almadan önce neye dikkat etmeliyim?', 'What should I know before buying?'))
+  // 14. Return / Shipping when room remains
+  if (questions.length < Math.min(6, maxBeforeReviews)) {
+    if (context.returnDays) {
+      add(q('İade süresi kaç gün?', 'What is the return policy?'))
+    } else if (context.shippingFee || /kargo|teslim|ship/i.test(context.availability || '')) {
+      add(q('Kargo ve teslimat nasıl?', 'How fast does it ship?'))
+    }
+  }
+
+  // 15. Reviews (guaranteed slot when reviews exist)
+  if (hasReviews) {
+    add(q('Yorumlar nasıl?', 'How are the reviews?'), MAX_SUGGESTED_QUESTIONS)
+  }
+
+  // 16. Summary
+  if (questions.length < MAX_SUGGESTED_QUESTIONS) {
+    add(
+      q('Satın almadan önce neye dikkat etmeliyim?', 'What should I know before buying?'),
+      MAX_SUGGESTED_QUESTIONS,
+    )
+  }
 
   return questions.slice(0, MAX_SUGGESTED_QUESTIONS)
 }
@@ -830,7 +1015,7 @@ export function extractProductContext(): ProductContext {
   const reviews = mergeReviews(jsonLdReviews(product), visibleReviews(root))
   const normalizedReviewCount = reviewCount !== undefined && Number.isFinite(reviewCount) ? reviewCount : reviews.length || undefined
   const reviewSummary = summarizeReviews(reviews, rating, normalizedReviewCount)
-  const assemblyPattern = /montaj|monte|kurulum|kurmak|kurul(?:um|ması)|parça|yanlık|vida|ayak/i
+  const assemblyPattern = /\b(?:montaj|demonte|kurulum\w*|kurmas[ıi]|kurulmas[ıi]|assembly|assemble)\b|\bmonte\s+(?:ed|et|gel|ol|için|icin)/i
   const assemblyEvidence = unique(reviews
     .filter((review) => assemblyPattern.test(review.body) && (review.rating === undefined || review.rating <= 3 || /sorun|edemedim|eksik|zor|kırık|bozuk|uyumsuz/i.test(review.body)))
     .map((review) => review.body), 4)

@@ -171,6 +171,7 @@ function buildGroundedPrompts(payload: AskPayload): {
     langInstruction,
     'Keep answers concise (1-3 short sentences), direct, and helpful.',
     'You may make cautious practical inferences strictly grounded in the evidence (e.g. breathable linen/cotton for summer, true-to-size vs tight fit from reviews), clearly noting when customer opinions differ.',
+    'When the shopper asks about an unlisted variant, color, or material while another option is explicitly listed in the evidence, state the listed option and clearly note that the requested one is not mentioned.',
     `If the provided evidence does not answer the question, reply exactly: "${notFoundText}"`,
     'Never invent specs, prices, sizes, or guarantees.',
     'Never add headings or labels like "Evidence:", "Source:", "Kanıt:", or "Kaynak:", and do not use Markdown bold (**).',
