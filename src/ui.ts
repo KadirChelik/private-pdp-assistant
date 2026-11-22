@@ -37,7 +37,9 @@ function buildKeyFacts(context: ProductContext): string[] {
   if (facts.length < 4 && sizeList?.length) {
     const preview = sizeList.slice(0, 5).join(', ')
     const suffix = sizeList.length > 5 ? ` +${sizeList.length - 5}` : ''
-    const isTr = /ç|ğ|ı|ö|ş|ü|TL|₺/i.test(`${context.title ?? ''} ${context.listedPrice ?? ''}`)
+    const isTr =
+      document.documentElement.lang.toLocaleLowerCase().startsWith('tr') ||
+      /ç|ğ|ı|ö|ş|ü|TL|₺/i.test(`${context.title ?? ''} ${context.listedPrice ?? ''}`)
     pushFact(`${isTr ? 'Stok' : 'Sizes'}: ${preview}${suffix}`)
   }
 
@@ -84,6 +86,7 @@ export class AssistantWidget {
         <main class="pdp-body" aria-live="polite"></main>
         <footer class="pdp-composer pdp-hidden"><div class="pdp-suggestions" aria-label="Suggested questions"></div><form class="pdp-form"><input aria-label="Ask about this product" placeholder="Ask about this product…" maxlength="500" autocomplete="off"><button class="pdp-send" aria-label="Send" disabled>${sendIcon}</button></form><div class="pdp-privacy">Local retrieval · Only matched facts leave device when cloud needed</div></footer>
       </section>`
+    this.applyChromeLanguage(this.isDocumentTurkish())
     this.bind()
   }
 
@@ -98,10 +101,18 @@ export class AssistantWidget {
     const context = extractProductContext()
     const panel = this.q<HTMLElement>('.pdp-panel')
     const isOpen = !panel.classList.contains('pdp-hidden')
+    const isTr = this.isDocumentTurkish()
+    this.applyChromeLanguage(isTr)
     if (!hasProductContext(context)) {
       this.ready = false
       if (isOpen) {
-        this.showState('empty', 'No product found', 'I couldn’t find enough visible product information on this page.')
+        this.showState(
+          'empty',
+          isTr ? 'Ürün bulunamadı' : 'No product found',
+          isTr
+            ? 'Bu sayfada görünür ürün bilgisi bulunamadı.'
+            : 'I couldn’t find enough visible product information on this page.',
+        )
       }
       return
     }
@@ -245,11 +256,19 @@ export class AssistantWidget {
   }
 
   private initialize(): void {
+    const isTr = this.isDocumentTurkish()
+    this.applyChromeLanguage(isTr)
     try {
       const context = extractProductContext()
       if (!hasProductContext(context)) {
         this.ready = false
-        this.showState('empty', 'No product found', 'I couldn’t find enough visible product information on this page.')
+        this.showState(
+          'empty',
+          isTr ? 'Ürün bulunamadı' : 'No product found',
+          isTr
+            ? 'Bu sayfada görünür ürün bilgisi bulunamadı.'
+            : 'I couldn’t find enough visible product information on this page.',
+        )
         return
       }
 
@@ -261,7 +280,12 @@ export class AssistantWidget {
     } catch (error) {
       if (this.disposed) return
       console.error('[PDP Assistant]', error)
-      this.showState('error', 'Unexpected error', 'The assistant could not start. Please try again.', true)
+      this.showState(
+        'error',
+        isTr ? 'Beklenmeyen hata' : 'Unexpected error',
+        isTr ? 'Asistan başlatılamadı. Lütfen tekrar deneyin.' : 'The assistant could not start. Please try again.',
+        true,
+      )
     }
   }
 
@@ -447,20 +471,19 @@ export class AssistantWidget {
       return button
     }))
 
-    const input = this.q<HTMLInputElement>('input')
-    input.placeholder = isTurkish ? 'Bu ürün hakkında soru sorun…' : 'Ask about this product…'
-    this.q('.pdp-privacy').textContent = isTurkish
-      ? 'Yerel ayrıştırma · Buluta yalnızca eşleşen kısa kanıtlar gider'
-      : 'Local retrieval · Only matched evidence leaves device when cloud needed'
+    this.applyChromeLanguage(isTurkish)
 
     this.q('.pdp-composer').classList.remove('pdp-hidden')
-    if (focusInput) input.focus()
+    if (focusInput) this.q<HTMLInputElement>('input').focus()
   }
 
   private showState(kind: string, title: string, message: string, retry = false): void {
+    const isTr = this.isDocumentTurkish()
+    this.applyChromeLanguage(isTr)
     const symbols: Record<string, string> = { empty: '⌕', unsupported: '!', loading: '···', error: '↻' }
     this.q('.pdp-composer').classList.add('pdp-hidden')
-    this.q('.pdp-body').innerHTML = `<div class="pdp-state"><div class="pdp-state-icon">${symbols[kind] ?? '!'}</div><strong>${this.escape(title)}</strong><p>${this.escape(message)}</p>${retry ? '<button class="pdp-retry">Try again</button>' : ''}</div>`
+    const retryLabel = isTr ? 'Tekrar dene' : 'Try again'
+    this.q('.pdp-body').innerHTML = `<div class="pdp-state"><div class="pdp-state-icon">${symbols[kind] ?? '!'}</div><strong>${this.escape(title)}</strong><p>${this.escape(message)}</p>${retry ? `<button class="pdp-retry">${retryLabel}</button>` : ''}</div>`
     this.root.querySelector('.pdp-retry')?.addEventListener('click', () => this.initialize())
   }
 
@@ -489,7 +512,50 @@ export class AssistantWidget {
     launcher.focus()
   }
   private productKey(context: ProductContext): string {
-    return [context.url.split('#')[0], context.sku || '', context.title || ''].join('|')
+    return [
+      context.url.split('#')[0],
+      document.documentElement.lang || '',
+      context.sku || '',
+      context.title || '',
+    ].join('|')
+  }
+  private isDocumentTurkish(): boolean {
+    return document.documentElement.lang.toLocaleLowerCase().startsWith('tr')
+  }
+  private applyChromeLanguage(isTurkish: boolean): void {
+    const launcher = this.root.querySelector<HTMLElement>('.pdp-launcher')
+    if (launcher) launcher.setAttribute('aria-label', isTurkish ? 'Ürün asistanını aç' : 'Open product assistant')
+
+    const panel = this.root.querySelector<HTMLElement>('.pdp-panel')
+    if (panel) panel.setAttribute('aria-label', isTurkish ? 'Ürün asistanı' : 'Product assistant')
+
+    const close = this.root.querySelector<HTMLElement>('.pdp-close')
+    if (close) close.setAttribute('aria-label', isTurkish ? 'Kapat' : 'Close')
+
+    const suggestions = this.root.querySelector<HTMLElement>('.pdp-suggestions')
+    if (suggestions) suggestions.setAttribute('aria-label', isTurkish ? 'Önerilen sorular' : 'Suggested questions')
+
+    const input = this.root.querySelector<HTMLInputElement>('.pdp-form input')
+    if (input) {
+      const promptText = isTurkish ? 'Bu ürün hakkında soru sorun…' : 'Ask about this product…'
+      input.setAttribute('aria-label', isTurkish ? 'Bu ürün hakkında soru sorun' : 'Ask about this product')
+      input.placeholder = promptText
+    }
+
+    const send = this.root.querySelector<HTMLElement>('.pdp-send')
+    if (send) send.setAttribute('aria-label', isTurkish ? 'Gönder' : 'Send')
+
+    const privacy = this.root.querySelector<HTMLElement>('.pdp-privacy')
+    if (privacy) {
+      privacy.textContent = isTurkish
+        ? 'Yerel ayrıştırma · Buluta yalnızca eşleşen kısa kanıtlar gider'
+        : 'Local retrieval · Only matched evidence leaves device when cloud needed'
+    }
+
+    const headerSub = this.root.querySelector<HTMLElement>('.pdp-header-sub')
+    if (headerSub && !this.ready) {
+      headerSub.innerHTML = `<i class="pdp-dot"></i> ${this.escape(this.runtimeBadgeText(isTurkish).headerSub)}`
+    }
   }
   private contextNeedsTurkish(context: ProductContext): boolean {
     if (document.documentElement.lang.toLocaleLowerCase().startsWith('tr')) return true

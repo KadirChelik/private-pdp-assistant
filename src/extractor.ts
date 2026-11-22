@@ -236,8 +236,14 @@ function formatPrice(value: unknown, currencyValue: unknown): string {
 }
 
 function priceFromText(value: string): string {
-  const match = clean(value).match(/(?:₺\s*)?(\d[\d.,]*)\s*(TL|TRY|₺)/i)
-  return match ? formatPrice(match[1], 'TRY') : ''
+  const normalized = clean(value)
+  const trMatch = normalized.match(/(?:₺\s*)?(\d[\d.,]*)\s*(TL|TRY|₺)/i)
+  if (trMatch) return formatPrice(trMatch[1], 'TRY')
+  const symbolPrefix = normalized.match(/([$€£])\s*(\d[\d.,]*)/)
+  if (symbolPrefix) return `${symbolPrefix[1]}${symbolPrefix[2]}`
+  const codeSuffix = normalized.match(/(\d[\d.,]*)\s*(USD|EUR|GBP)/i)
+  if (codeSuffix) return formatPrice(codeSuffix[1], codeSuffix[2])
+  return ''
 }
 
 function extractBasketDiscount(root: ParentNode): {
@@ -822,7 +828,7 @@ function extractColorOptions(
 }
 
 function extractModelMeasurements(root: HTMLElement, descriptionText: string): string[] {
-  const MODEL_RE = /\b(?:manken\w*|modelin\s+üzerindeki|model\s+(?:is|wears|wearing|boy|ölçü|olcu)|mannequin)\b/i
+  const MODEL_RE = /\b(?:manken\w*|modelin\s+üzerindeki|model\s+(?:is|wears|wearing|height|measurements?|size|boy|ölçü|olcu)|mannequin)\b/i
   const results: string[] = []
 
   for (const line of descriptionText.split(/[\n.]+/)) {

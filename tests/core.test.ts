@@ -1354,3 +1354,102 @@ test('prepareQuestionEvidence bounds long formatted evidenceLines below /api/ask
     restore()
   }
 })
+
+test('EN demo dress/shoe and TR demo pack localize model measurements, cart price, sizes, and suggestions cleanly', () => {
+  const restoreDress = installDom(`<!doctype html><html lang="en"><body>
+    <main class="product-detail">
+      <h1>Solis 100% Linen Midi Dress</h1>
+      <div class="price">$79.00</div>
+      <div class="size-section">
+        <ul class="size-list">
+          <li><button type="button" class="size-btn">XS</button></li>
+          <li><button type="button" class="size-btn">S</button></li>
+          <li><button type="button" class="size-btn">M</button></li>
+          <li><button type="button" class="size-btn">L</button></li>
+          <li><button type="button" class="size-btn" disabled>XL</button></li>
+        </ul>
+      </div>
+      <p class="model-info">Model is 176 cm tall · Wearing size S</p>
+      <ul class="specs">
+        <li><span>Fabric</span><strong>100% Natural Linen</strong></li>
+        <li><span>Fit</span><strong>Relaxed fit</strong></li>
+        <li><span>Lining</span><strong>Cotton inner lining (opaque)</strong></li>
+        <li><span>Care</span><strong>30°C gentle wash</strong></li>
+      </ul>
+      <article class="review"><span itemprop="ratingValue">5</span><p itemprop="reviewBody">Wore it to a summer wedding — 100% linen stayed cool.</p></article>
+    </main>
+  </body></html>`, 'https://demo.test/?lang=en')
+
+  try {
+    const dressCtx = extractProductContext()
+    assert.ok(dressCtx.inStockSizes?.includes('S'))
+    assert.ok(dressCtx.outOfStockSizes?.includes('XL'))
+    assert.match((dressCtx.modelMeasurements || []).join(' '), /176 cm.*Wearing size S/i)
+
+    const qs = getSuggestedQuestions(dressCtx)
+    assert.ok(qs.some((q) => /What sizes are available\?/i.test(q)))
+    assert.ok(!qs.some((q) => /[çğıöşü]|nedir|var mı/i.test(q)))
+
+    const sizesQ = prepareQuestionEvidence(dressCtx, 'Which sizes are in stock, is XL available?')
+    assert.equal(sizesQ.detectedIntent, 'size')
+    assert.equal(sizesQ.isTurkish, false)
+    assert.ok(sizesQ.relevantEvidence.some((e) => /Out-of-stock/i.test(e.label || '') && /\bXL\b/.test(e.value)))
+
+    const modelQ = prepareQuestionEvidence(dressCtx, 'What size is the model wearing?')
+    assert.equal(modelQ.detectedIntent, 'size')
+    assert.ok(modelQ.relevantEvidence.some((e) => /Wearing size S/i.test(e.value)))
+  } finally {
+    restoreDress()
+  }
+
+  const restoreShoe = installDom(`<!doctype html><html lang="en"><body>
+    <main class="product-detail">
+      <h1>AeroStride Pro Running Shoe</h1>
+      <div class="price">$119.00</div>
+      <div class="discount-price">In cart $99.00</div>
+      <ul class="size-list">
+        <li><button type="button" class="size-btn">40</button></li>
+        <li><button type="button" class="size-btn">41</button></li>
+        <li><button type="button" class="size-btn" disabled>44</button></li>
+      </ul>
+      <ul class="specs"><li><span>Fit</span><strong>True to size</strong></li></ul>
+    </main>
+  </body></html>`, 'https://demo.test/?lang=en')
+
+  try {
+    const shoeCtx = extractProductContext()
+    assert.equal(shoeCtx.basketPrice, '$99.00')
+    const cartQ = prepareQuestionEvidence(shoeCtx, 'What is the cart price?')
+    assert.equal(cartQ.detectedIntent, 'price')
+    assert.ok(cartQ.relevantEvidence.some((e) => /\$99\.00/.test(e.value)))
+
+    const shoeQs = getSuggestedQuestions(shoeCtx)
+    assert.ok(shoeQs.some((q) => /What shoe sizes are available\?/i.test(q)))
+  } finally {
+    restoreShoe()
+  }
+
+  const restorePackTr = installDom(`<!doctype html><html lang="tr"><body>
+    <main class="product-detail">
+      <h1>Terra Trail 28L Sırt Çantası</h1>
+      <div class="price">4.290 TL</div>
+      <ul class="specs">
+        <li><span>Kapasite</span><strong>28 litre</strong></li>
+        <li><span>Ağırlık</span><strong>980 g</strong></li>
+        <li><span>Laptop Bölmesi</span><strong>16 inç'e kadar</strong></li>
+      </ul>
+      <article class="review"><span itemprop="ratingValue">5</span><p itemprop="reviewBody">16 inç laptopum dolgulu bölmeye tam sığıyor.</p></article>
+    </main>
+  </body></html>`, 'https://demo.test/?lang=tr')
+
+  try {
+    const packCtx = extractProductContext()
+    const trQs = getSuggestedQuestions(packCtx)
+    assert.ok(trQs.some((q) => /Fiyatı ne kadar\?/i.test(q)))
+    const macQ = prepareQuestionEvidence(packCtx, '16 inç MacBook sığar mı?')
+    assert.equal(macQ.isTurkish, true)
+    assert.ok(macQ.relevantEvidence.some((e) => /16 inç/i.test(e.value)))
+  } finally {
+    restorePackTr()
+  }
+})

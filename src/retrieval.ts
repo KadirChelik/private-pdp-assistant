@@ -490,7 +490,11 @@ function isSizeAvailabilityContext(value: string): boolean {
     /\bstokta\s+hangi/,
     /\bavailable\s+sizes/,
     /\bwhat\s+sizes/,
+    /\bwhich\s+sizes/,
     /\bsizes?\s+in\s+stock/,
+    /\b(?:is|are)\s+(?:xxs|xs|s|m|l|xl|xxl|2xl|3xl|\d{2}(?:[.,]5)?)\s+(?:available|in\s+stock)\b/,
+    /\bmodel(?:'s)?\s+(?:is\s+)?(?:wearing|wears|height|size|measurements?)/,
+    /\bsize\s+(?:is\s+)?the\s+model\b/,
     /\b(?:xxs|xs|s|m|l|xl|xxl|2xl|3xl|\d{2}(?:[.,]5)?)\s*(?:beden|numara|size)\b/,
     /\bsize\s*(?:xxs|xs|s|m|l|xl|xxl|\d{2})\b/,
     /\b(?:xxs|xs|s|m|l|xl|xxl|2xl|3xl)\s+(?:stokta\s+)?var\s+mi\b/,
@@ -581,11 +585,11 @@ export function detectQuestionIntent(question: string): QuestionIntent {
     return 'openedBedDimensions'
   }
 
+  if (isSizeAvailabilityContext(value)) return 'size'
   if (isDimensionContext(value)) return 'dimensions'
   if (isReturnContext(value)) return 'returnPolicy'
   if (isDeliveryContext(value)) return 'delivery'
   if (isCareContext(value)) return 'care'
-  if (isSizeAvailabilityContext(value)) return 'size'
   if (isSuitabilityContext(value)) return 'suitability'
   if (isFitContext(value)) return 'fit'
   if (isReviewContext(value)) return 'reviews'
@@ -1773,7 +1777,7 @@ function capEvidenceChars(items: EvidenceItem[], maxChars = MAX_PROMPT_EVIDENCE_
 function refineEvidence(question: string, items: EvidenceItem[]): EvidenceItem[] {
   const intent = detectQuestionIntent(question)
   const normalizedQuestion = normalize(question)
-  if (intent === 'price' && /sepet|basket/.test(normalizedQuestion)) {
+  if (intent === 'price' && /sepet|basket|cart/.test(normalizedQuestion)) {
     const basket = items.filter((item) => item.type === 'basketPrice')
     return basket.length ? basket.slice(0, 2) : items.filter((item) => item.type === 'price').slice(0, 2)
   }

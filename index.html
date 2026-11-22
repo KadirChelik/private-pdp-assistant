@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="en">
+<html lang="tr">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="description" content="3-category live demo storefront and Pipeline Inspector for Private PDP Assistant — a privacy-first local-retrieval AI product widget." />
+    <meta name="description" content="Private PDP Assistant — 3 kategorili canlı demo mağazası ve gizlilik odaklı yerel çıkarım inceleyici (Pipeline Inspector)." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>Private PDP Assistant — Privacy-First Local-Retrieval AI Demo</title>
+    <title>Private PDP Assistant — Gizlilik Odaklı Yerel Çıkarımlı AI Demo</title>
     <style>
       :root{--bg:#f5f2ea;--surface:#fffdf9;--ink:#183126;--muted:#53645b;--line:#d5ddd7;--brand:#173f2b;--accent:#257246}
       *{box-sizing:border-box}
@@ -16,9 +16,14 @@
       .prod-tab{border:1px solid #cad6ce;border-radius:999px;background:#fff;color:var(--ink);padding:7px 14px;font:650 13px/1.2 inherit;cursor:pointer;transition:all .15s}
       .prod-tab:hover{border-color:var(--brand);background:#eef5f0}
       .prod-tab.active{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:0 4px 12px #173f2b24}
-      .nav-links{display:flex;gap:20px;font-size:13.5px;color:var(--muted)}
+      .nav-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+      .nav-links{display:flex;gap:18px;font-size:13.5px;color:var(--muted)}
       .nav-links a{color:inherit;text-decoration:none;font-weight:600}
       .nav-links a:hover{color:var(--ink)}
+      .lang-switch{display:inline-flex;align-items:center;padding:3px;border-radius:999px;border:1px solid #cad6ce;background:#fff;gap:2px}
+      .lang-btn{border:0;border-radius:999px;background:transparent;color:var(--muted);padding:4px 10px;font:700 12px/1.2 inherit;cursor:pointer;transition:all .15s}
+      .lang-btn:hover{color:var(--ink);background:#eef5f0}
+      .lang-btn.active{background:var(--brand);color:#fff}
 
       .product-detail{max-width:1120px;margin:40px auto;padding:0 24px;display:grid;grid-template-columns:1fr 1fr;gap:52px;align-items:start}
       .photo-col{display:flex;flex-direction:column;gap:20px}
@@ -108,54 +113,25 @@
         .photo{min-height:300px}
       }
     </style>
-    <script id="product-jsonld" type="application/ld+json">{
-      "@context": "https://schema.org",
-      "@type": "Product",
-      "name": "Terra Trail Pack 28L",
-      "description": "A weather-resistant daypack built for long trails and short escapes. Ventilated back panel and contoured shoulder straps keep the load comfortable all day.",
-      "sku": "TTP-28-MOSS",
-      "brand": { "@type": "Brand", "name": "Northwind Goods" },
-      "offers": {
-        "@type": "Offer",
-        "price": "129.00",
-        "priceCurrency": "USD",
-        "availability": "https://schema.org/InStock"
-      },
-      "aggregateRating": {
-        "@type": "AggregateRating",
-        "ratingValue": "4.8",
-        "reviewCount": "3"
-      },
-      "review": [
-        {
-          "@type": "Review",
-          "reviewRating": { "@type": "Rating", "ratingValue": "5" },
-          "reviewBody": "Light on the shoulders even on 18 km day hikes, and the ventilated back panel stays comfortable."
-        },
-        {
-          "@type": "Review",
-          "reviewRating": { "@type": "Rating", "ratingValue": "5" },
-          "reviewBody": "Fits my 16-inch laptop neatly in the padded sleeve with room left for rain gear."
-        },
-        {
-          "@type": "Review",
-          "reviewRating": { "@type": "Rating", "ratingValue": "4" },
-          "reviewBody": "Tough ripstop fabric handles wet trail conditions well. Wish it had one extra side pocket."
-        }
-      ]
-    }</script>
+    <script id="product-jsonld" type="application/ld+json">{}</script>
   </head>
   <body>
     <nav data-pdp-assistant-ignore>
       <div class="brand">PRIVATE PDP DEMO</div>
-      <div class="switcher" role="tablist" aria-label="Switch demo product category">
-        <button type="button" class="prod-tab active" data-product="backpack" role="tab" aria-selected="true">Outdoor Pack · EN</button>
-        <button type="button" class="prod-tab" data-product="shoe" role="tab" aria-selected="false">Koşu Ayakkabısı · TR</button>
-        <button type="button" class="prod-tab" data-product="dress" role="tab" aria-selected="false">Keten Elbise · TR</button>
+      <div class="switcher" id="product-switcher" role="tablist" aria-label="Demo ürün kategorisini seç">
+        <button type="button" class="prod-tab active" data-product="backpack" role="tab" aria-selected="true">Sırt Çantası</button>
+        <button type="button" class="prod-tab" data-product="shoe" role="tab" aria-selected="false">Koşu Ayakkabısı</button>
+        <button type="button" class="prod-tab" data-product="dress" role="tab" aria-selected="false">Keten Elbise</button>
       </div>
-      <div class="nav-links">
-        <a href="#pipeline-inspector">Pipeline Inspector</a>
-        <a href="https://github.com/KadirChelik/private-pdp-assistant" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <div class="nav-actions">
+        <div class="nav-links">
+          <a href="#pipeline-inspector" id="nav-inspector-link">Pipeline Inspector</a>
+          <a href="https://github.com/KadirChelik/private-pdp-assistant" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </div>
+        <div class="lang-switch" role="group" aria-label="Dil seçimi">
+          <button type="button" class="lang-btn" data-lang="tr" aria-pressed="true">TR</button>
+          <button type="button" class="lang-btn" data-lang="en" aria-pressed="false">EN</button>
+        </div>
       </div>
     </nav>
 
@@ -165,23 +141,23 @@
       <div class="inspector-shell">
         <div class="inspector-top">
           <div>
-            <div class="inspector-eyebrow">Privacy-First Local Retrieval + Minimized Cloud · Live Diagnostics</div>
-            <h2>Live Extraction &amp; Minimized Cloud Payload Inspector</h2>
-            <p>
-              Every browser extracts Schema.org JSON-LD, specs, and reviews locally (zero HTML, zero cookies, zero PII sent). Out-of-page questions stop at <strong>0 bytes</strong> locally, while answered queries send only <strong>1–8 matched facts</strong> (~200–1,100 B) + 2-turn follow-up context to <code>/api/ask</code>.
+            <div class="inspector-eyebrow" id="inspector-eyebrow">Gizlilik Odaklı Yerel Çıkarım + Minimal Bulut · Canlı İnceleme</div>
+            <h2 id="inspector-title">Canlı Çıkarım &amp; Pipeline Inspector</h2>
+            <p id="inspector-desc">
+              Tarayıcıdaki her mağaza Schema.org JSON-LD verilerini, beden/stok listelerini, renk varyantlarını, teknik tabloları ve yorumları yerelde ayrıştırır (0 HTML, 0 cookie, 0 PII). Sayfa dışı sorular yerelde <strong>0 byte</strong> ile durdurulur; yanıtlanan sorularda yalnızca eşleşen <strong>1–10 kanıt satırı</strong> <code>/api/ask</code> uç noktasına iletilir.
             </p>
           </div>
           <div class="caps">
-            <span id="cap-tier" class="cap-pill" data-state="ready">Zero-Download · Works Everywhere</span>
-            <span class="cap-pill" data-state="hybrid">Privacy: 0 HTML · 0 PII · 0 B Gate</span>
+            <span id="cap-tier" class="cap-pill" data-state="ready">İndirmesiz · Tüm Tarayıcılarda Çalışır</span>
+            <span id="cap-privacy" class="cap-pill" data-state="hybrid">Gizlilik: 0 HTML · 0 PII · 0 B Kapısı</span>
           </div>
         </div>
 
         <div class="inspector-controls">
           <div class="chip-row" id="inspector-chips"></div>
           <form class="inspector-form" id="inspector-form">
-            <input id="inspector-question" type="text" value="" placeholder="Ask any custom EN or TR question to trace extraction & minimized payload…" aria-label="Question to inspect" />
-            <button type="submit">Inspect Retrieval</button>
+            <input id="inspector-question" type="text" value="" placeholder="Çıkarımı ve gönderilecek veri boyutunu görmek için bir soru yazın…" aria-label="İncelenecek soru" />
+            <button type="submit" id="inspector-submit">Çıkarımı İncele</button>
           </form>
         </div>
 
@@ -190,16 +166,16 @@
         <div class="inspector-grid">
           <div class="panel-box">
             <div class="panel-title">
-              <span>1. Extracted ProductContext</span>
-              <span class="badge" id="ctx-source-badge">loading…</span>
+              <span id="panel-ctx-title">1. Çıkarılan ProductContext</span>
+              <span class="badge" id="ctx-source-badge">yükleniyor…</span>
             </div>
             <div class="ctx-kv" id="ctx-summary"></div>
           </div>
 
           <div class="panel-box">
             <div class="panel-title">
-              <span>2. Intent &amp; Grounded Retrieval</span>
-              <span class="badge" id="retrieval-intent-badge">intent: —</span>
+              <span id="panel-ret-title">2. Niyet &amp; Kanıt Eşleştirme</span>
+              <span class="badge" id="retrieval-intent-badge">niyet: —</span>
             </div>
             <div id="retrieval-results" class="evidence-list"></div>
           </div>
@@ -208,15 +184,12 @@
         <div class="setup-grid">
           <div class="snippet-box">
             <div class="snippet-head">
-              <span>Inject on any e-commerce PDP via DevTools Console</span>
-              <button type="button" class="copy-btn" id="copy-snippet">Copy snippet</button>
+              <span id="snippet-title">DevTools Konsoluyla Herhangi Bir E-Ticaret PDP Sayfasına Enjekte Et</span>
+              <button type="button" class="copy-btn" id="copy-snippet">Kopyala</button>
             </div>
             <pre id="inject-snippet">(()=>{const s=document.createElement('script');s.src='https://private-pdp-assistant.vercel.app/private-pdp-assistant.js';s.onerror=()=>console.warn('[PDP Assistant] Blocked by this site CSP.');document.head.append(s)})()</pre>
           </div>
-          <div class="flags-box">
-            <strong>Architecture Decision: Local Retrieval + Minimized Cloud</strong>
-            On-device Gemini Nano requires a ~1.5 GB Chrome-only download and degraded on Turkish reasoning, so retrieval &amp; filtering stay 100% local while only matched facts go to <code>/api/ask</code> (<code>Gemini → Groq → OpenRouter</code>). Offline fallback is automatic, or force 0 B mode via <code>window.PDPAssistantConfig = { mode: 'local-only' }</code>.
-          </div>
+          <div class="flags-box" id="arch-box"></div>
         </div>
       </div>
     </section>
@@ -224,168 +197,492 @@
     <script type="module" src="/src/main.ts"></script>
     <script>
       (function () {
-        const PRODUCTS = {
-          backpack: {
-            lang: 'en',
-            theme: 'pack',
-            badge: 'Outdoor · Hybrid PDP Demo',
-            brand: 'Northwind Goods',
-            title: 'Terra Trail Pack 28L',
-            priceText: '$129.00',
-            basketDiscount: '',
-            ratingText: '★ 4.8 / 5 · 3 reviews',
-            stockText: 'In stock — ships in 1–2 days',
-            buyLabel: 'Add to bag',
-            reviewsHeading: 'Customer Reviews',
-            reviewsSub: '★ 4.8 / 5 (3 reviews)',
-            description: 'A weather-resistant daypack built for long trails and short escapes. Ventilated back panel and contoured shoulder straps keep the load comfortable all day.',
-            svg: '<svg viewBox="0 0 128 128" fill="none" aria-hidden="true"><path d="M44 26c0-9 9-14 20-14s20 5 20 14" stroke="#173f2b" stroke-width="6" stroke-linecap="round"/><rect x="28" y="26" width="72" height="86" rx="22" fill="#173f2b"/><path d="M36 48c0-8 6-14 14-14h28c8 0 14 6 14 14v12H36V48Z" fill="#235b3f"/><rect x="42" y="68" width="44" height="30" rx="10" fill="#2d6e4c"/><path d="M56 54h16" stroke="#b9dfc7" stroke-width="4" stroke-linecap="round"/><path d="M48 76h32" stroke="#b9dfc7" stroke-width="3" stroke-linecap="round"/></svg>',
-            specs: [
-              ['Capacity', '28 litres'],
-              ['Weight', '980 g'],
-              ['Material', 'Recycled ripstop nylon'],
-              ['Laptop sleeve', 'Up to 16 inches'],
-              ['Warranty', 'Lifetime repairs'],
-            ],
-            reviews: [
-              { rating: 5, author: 'Verified hiker', body: 'Light on the shoulders even on 18 km day hikes, and the ventilated back panel stays comfortable.' },
-              { rating: 5, author: 'Daily commuter', body: 'Fits my 16-inch laptop neatly in the padded sleeve with room left for rain gear.' },
-              { rating: 4, author: 'Weekend camper', body: 'Tough ripstop fabric handles wet trail conditions well. Wish it had one extra side pocket.' },
-            ],
-            jsonLd: {
-              '@context': 'https://schema.org',
-              '@type': 'Product',
-              name: 'Terra Trail Pack 28L',
-              description: 'A weather-resistant daypack built for long trails and short escapes. Ventilated back panel and contoured shoulder straps keep the load comfortable all day.',
-              sku: 'TTP-28-MOSS',
-              brand: { '@type': 'Brand', name: 'Northwind Goods' },
-              offers: { '@type': 'Offer', price: '129.00', priceCurrency: 'USD', availability: 'https://schema.org/InStock' },
-              aggregateRating: { '@type': 'AggregateRating', ratingValue: '4.8', reviewCount: '3' },
-              review: [
-                { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'Light on the shoulders even on 18 km day hikes, and the ventilated back panel stays comfortable.' },
-                { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'Fits my 16-inch laptop neatly in the padded sleeve with room left for rain gear.' },
-                { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '4' }, reviewBody: 'Tough ripstop fabric handles wet trail conditions well. Wish it had one extra side pocket.' },
-              ],
+        const LANG_STORAGE_KEY = 'pdp-demo-lang'
+
+        const I18N = {
+          tr: {
+            pageTitle: 'Private PDP Assistant — Gizlilik Odaklı Yerel Çıkarımlı AI Demo',
+            metaDesc: 'Private PDP Assistant için 3 kategorili canlı demo mağazası ve Pipeline Inspector tanı paneli.',
+            switcherLabel: 'Demo ürün kategorisini seç',
+            langSwitchLabel: 'Dil seçimi',
+            tabs: {
+              backpack: 'Sırt Çantası',
+              shoe: 'Koşu Ayakkabısı',
+              dress: 'Keten Elbise',
             },
-            chips: [
-              'Can it fit a 16-inch MacBook?',
-              'How heavy is this backpack?',
-              'What do customer reviews say?',
-              'Does it come in red?',
-            ],
+            eyebrow: 'Gizlilik Odaklı Yerel Çıkarım + Minimal Bulut · Canlı İnceleme',
+            title: 'Canlı Çıkarım & Pipeline Inspector',
+            desc: 'Her tarayıcı Schema.org JSON-LD verilerini, beden/stok durumlarını, renk varyantlarını, manken ölçülerini ve yorumları yerelde ayrıştırır (0 HTML, 0 cookie, 0 PII). Sayfa dışı sorular <strong>0 byte</strong> ile yerelde durdurulur; yanıtlanan sorularda yalnızca eşleşen <strong>1–10 kanıt satırı</strong> <code>/api/ask</code> uç noktasına gönderilir.',
+            capReady: 'İndirmesiz · Tüm Tarayıcılarda Çalışır',
+            capPrivacy: 'Gizlilik: 0 HTML · 0 PII · 0 B Kapısı',
+            inputPlaceholder: 'Çıkarımı ve gönderilecek kanıt yükünü incelemek için bir soru sorun…',
+            inputAriaLabel: 'İncelenecek ürün sorusu',
+            submitBtn: 'Çıkarımı İncele',
+            panelCtxTitle: '1. Çıkarılan ProductContext',
+            panelRetTitle: '2. Niyet & Kanıt Eşleştirme',
+            loadingBadge: 'yükleniyor…',
+            snippetTitle: 'DevTools Konsoluyla Herhangi Bir E-Ticaret PDP Sayfasına Enjekte Et',
+            copyBtn: 'Kopyala',
+            copiedBtn: 'Kopyalandı!',
+            archHtml:
+              '<strong>Mimari Karar: Yerel Çıkarım + Minimal Bulut</strong>' +
+              'Tarayıcı içi Gemini Nano modeli ~1.5 GB Chrome indirmesi gerektirdiği ve Türkçe muhakemede zayıf kaldığı için çıkarıldı; ayrıştırma %100 yerelde kalırken yalnızca eşleşen kanıt satırları <code>/api/ask</code> (<code>Gemini → Groq → OpenRouter</code>) uç noktasına gider. Çevrimdışı yerel yedek otomatiktir veya <code>window.PDPAssistantConfig = { mode: \'local-only\' }</code> ile 0 B modu zorlanabilir.',
+            evidenceItemsSuffix: 'kanıt öğesi',
+            visibleDomFallback: 'görünür DOM',
+            cartShort: 'Sepet',
+            reviewsWord: 'yorum',
+            attributesWord: 'özellik',
+            ctxLabels: {
+              title: 'Başlık',
+              price: 'Fiyat',
+              availability: 'Stok Durumu',
+              rating: 'Puan',
+              specs: 'Çıkarılan Özellikler',
+              reviews: 'İndekslenen Yorum',
+            },
+            intentPrefix: 'niyet: ',
+            matchedWord: 'eşleşen',
+            gateBanner: '<span>Bulut İsteği Yükü: <strong>0 byte — Yerel NOT_FOUND Kapısı</strong></span><span>0 HTML · 0 cookie · 0 API maliyeti</span>',
+            gateBoxTitle: 'Eşleşen sayfa kanıtı yok → Yerel NOT_FOUND Kapısı (0 byte gönderildi)',
+            gateBoxBody: function (q) {
+              return 'Bu sayfadaki hiçbir özellik, teknik tablo veya müşteri yorumu "' + q + '" sorusunu desteklemiyor. /api/ask çağrılmadan yerelde 0 ms içinde durduruldu.'
+            },
+            payloadBanner: function (count, bytes) {
+              return '<span>Buluta Gönderilecek Yük: <strong>' + count + ' kanıt · ~' + bytes + ' byte</strong></span><span>0 HTML · 0 cookie · 0 PII</span>'
+            },
+            scoreWord: 'skor',
           },
-          shoe: {
-            lang: 'tr',
-            theme: 'shoe',
-            badge: 'Ayakkabı · Türkçe PDP Demo',
-            brand: 'AeroStride',
-            title: 'AeroStride Pro Koşu Ayakkabısı',
-            priceText: '3.499 TL',
-            basketDiscount: 'Sepette 2.999 TL',
-            ratingText: '★ 4.6 / 5 · 3 yorum',
-            stockText: 'Stokta var — 24 saat içinde kargoda',
-            buyLabel: 'Sepete Ekle',
-            reviewsHeading: 'Müşteri Yorumları',
-            reviewsSub: '★ 4.6 / 5 (3 yorum)',
-            description: 'Günlük tempo koşuları ve uzun mesafe antrenmanları için geliştirilen hafif koşu ayakkabısı. Çift yoğunluklu EVA orta taban darbe emilimi sağlarken nefes alan file saya ayağı serin tutar.',
-            svg: '<svg viewBox="0 0 128 128" fill="none" aria-hidden="true"><path d="M18 76c16 0 24-22 34-26l14 14c10 9 26 9 42 12 4 1 6 5 6 10v6H18V76Z" fill="#1b3a57"/><path d="M18 88h96v10c0 4-3 7-7 7H25c-4 0-7-3-7-7V88Z" fill="#e6eef7"/><path d="M50 56l18 14" stroke="#8ab4e1" stroke-width="4" stroke-linecap="round"/><path d="M40 66l14 10" stroke="#8ab4e1" stroke-width="4" stroke-linecap="round"/></svg>',
-            specs: [
-              ['Taban', 'EVA orta taban + Kauçuk dış taban'],
-              ['Kalıp', 'Tam kalıp'],
-              ['Ağırlık', '245 g (42 numara)'],
-              ['Üst Yüzey', 'Nefes alan mühendislik file'],
-              ['Topuk Dropu', '8 mm'],
-              ['Garanti', '2 Yıl üretici garantisi'],
-            ],
-            reviews: [
-              { rating: 5, author: 'Maraton koşucusu', body: 'Çok hafif ve yastıklaması dizleri yormuyor. Tam numara aldım tam oldu.' },
-              { rating: 4, author: 'Günlük koşucu', body: 'Nefes alan file yüzeyi yazın terletmiyor; ancak geniş taraklı ayaklarda yarım numara büyük tercih edilebilir.' },
-              { rating: 5, author: 'Doğrulanmış alıcı', body: 'Islak asfaltta kauçuk taban tutuşu gayet güven veriyor, kargo ertesi gün ulaştı.' },
-            ],
-            jsonLd: {
-              '@context': 'https://schema.org',
-              '@type': 'Product',
-              name: 'AeroStride Pro Koşu Ayakkabısı',
-              description: 'Günlük tempo koşuları ve uzun mesafe antrenmanları için geliştirilen hafif koşu ayakkabısı. Çift yoğunluklu EVA orta taban darbe emilimi sağlarken nefes alan file saya ayağı serin tutar.',
-              sku: 'ASP-RUN-42',
-              brand: { '@type': 'Brand', name: 'AeroStride' },
-              offers: { '@type': 'Offer', price: '3499', priceCurrency: 'TRY', availability: 'https://schema.org/InStock' },
-              aggregateRating: { '@type': 'AggregateRating', ratingValue: '4.6', reviewCount: '3' },
-              review: [
-                { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'Çok hafif ve yastıklaması dizleri yormuyor. Tam numara aldım tam oldu.' },
-                { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '4' }, reviewBody: 'Nefes alan file yüzeyi yazın terletmiyor; ancak geniş taraklı ayaklarda yarım numara büyük tercih edilebilir.' },
-                { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'Islak asfaltta kauçuk taban tutuşu gayet güven veriyor, kargo ertesi gün ulaştı.' },
-              ],
+          en: {
+            pageTitle: 'Private PDP Assistant — Privacy-First Local-Retrieval AI Demo',
+            metaDesc: '3-category live demo storefront and Pipeline Inspector for Private PDP Assistant — a privacy-first local-retrieval AI product widget.',
+            switcherLabel: 'Switch demo product category',
+            langSwitchLabel: 'Language switcher',
+            tabs: {
+              backpack: 'Trail Pack',
+              shoe: 'Running Shoe',
+              dress: 'Linen Dress',
             },
-            sizes: ['40', '41', '42', '43', { label: '44', inStock: false }],
-            chips: [
-              'Hangi numaralar stokta var?',
-              'Geniş taraklı ayağa olur mu, kalıbı nasıl?',
-              'Sepette fiyatı ne kadar?',
-              'Kırmızı rengi var mı?',
-            ],
-          },
-          dress: {
-            lang: 'tr',
-            theme: 'dress',
-            badge: 'Giyim · Türkçe PDP Demo',
-            brand: 'Solis Atelier',
-            title: 'Solis %100 Keten Midi Elbise',
-            priceText: '2.190 TL',
-            basketDiscount: '',
-            ratingText: '★ 4.9 / 5 · 3 yorum',
-            stockText: 'Stokta var — aynı gün kargo',
-            buyLabel: 'Sepete Ekle',
-            reviewsHeading: 'Müşteri Yorumları',
-            reviewsSub: '★ 4.9 / 5 (3 yorum)',
-            description: 'Sıcak yaz günleri ve açık hava davetleri için tasarlanmış nefes alan %100 doğal keten midi elbise. İnce pamuklu iç astarı sayesinde iç göstermez ve rahat kesimiyle gün boyu konfor sunar.',
-            svg: '<svg viewBox="0 0 128 128" fill="none" aria-hidden="true"><path d="M48 22l16 10 16-10 8 20-10 6 14 58H36l14-58-10-6 8-20Z" fill="#5c4232"/><path d="M50 48h28" stroke="#e9d8ca" stroke-width="3" stroke-linecap="round"/></svg>',
-            specs: [
-              ['Kumaş', '%100 Doğal Keten'],
-              ['Kalıp', 'Rahat kesim'],
-              ['Boy', 'Midi (118 cm)'],
-              ['Astar', 'Pamuklu iç astar (iç göstermez)'],
-              ['Yıkama', '30°C hassas yıkama'],
-              ['Renk', 'Bej'],
-            ],
-            reviews: [
-              { rating: 5, author: 'Doğrulanmış alıcı', body: 'Yaz düğününde giydim, %100 keten olduğu için hiç terletmedi ve astarı sayesinde iç göstermiyor.' },
-              { rating: 5, author: 'Müşteri', body: 'Kalıbı rahat kesim, kendi bedeninizi alabilirsiniz. Doğal keten olduğu için ilk yıkamadan sonra hafif ütü istiyor.' },
-              { rating: 5, author: 'Müşteri', body: 'Bej rengi çok şık duruyor, 30 derecede hassas yıkamada çekme yapmadı.' },
-            ],
-            jsonLd: {
-              '@context': 'https://schema.org',
-              '@type': 'Product',
-              name: 'Solis %100 Keten Midi Elbise',
-              description: 'Sıcak yaz günleri ve açık hava davetleri için tasarlanmış nefes alan %100 doğal keten midi elbise. İnce pamuklu iç astarı sayesinde iç göstermez ve rahat kesimiyle gün boyu konfor sunar.',
-              sku: 'SLS-LINEN-BEJ',
-              brand: { '@type': 'Brand', name: 'Solis Atelier' },
-              offers: { '@type': 'Offer', price: '2190', priceCurrency: 'TRY', availability: 'https://schema.org/InStock' },
-              aggregateRating: { '@type': 'AggregateRating', ratingValue: '4.9', reviewCount: '3' },
-              review: [
-                { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'Yaz düğününde giydim, %100 keten olduğu için hiç terletmedi ve astarı sayesinde iç göstermiyor.' },
-                { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'Kalıbı rahat kesim, kendi bedeninizi alabilirsiniz. Doğal keten olduğu için ilk yıkamadan sonra hafif ütü istiyor.' },
-                { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'Bej rengi çok şık duruyor, 30 derecede hassas yıkamada çekme yapmadı.' },
-              ],
+            eyebrow: 'Privacy-First Local Retrieval + Minimized Cloud · Live Diagnostics',
+            title: 'Live Extraction & Pipeline Inspector',
+            desc: 'Every browser extracts Schema.org JSON-LD, size/stock availability, color variants, model measurements, and reviews locally (0 HTML, 0 cookies, 0 PII sent). Out-of-page questions stop at <strong>0 bytes</strong> locally, while answered queries send only <strong>1–10 matched facts</strong> to <code>/api/ask</code>.',
+            capReady: 'Zero-Download · Works Everywhere',
+            capPrivacy: 'Privacy: 0 HTML · 0 PII · 0 B Gate',
+            inputPlaceholder: 'Ask any EN or TR question to trace extraction & minimized payload…',
+            inputAriaLabel: 'Question to inspect',
+            submitBtn: 'Inspect Retrieval',
+            panelCtxTitle: '1. Extracted ProductContext',
+            panelRetTitle: '2. Intent & Grounded Retrieval',
+            loadingBadge: 'loading…',
+            snippetTitle: 'Inject on any e-commerce PDP via DevTools Console',
+            copyBtn: 'Copy snippet',
+            copiedBtn: 'Copied!',
+            archHtml:
+              '<strong>Architecture Decision: Local Retrieval + Minimized Cloud</strong>' +
+              'On-device Gemini Nano requires a ~1.5 GB Chrome-only download and degraded on Turkish reasoning, so retrieval & filtering stay 100% local while only matched facts go to <code>/api/ask</code> (<code>Gemini → Groq → OpenRouter</code>). Offline fallback is automatic, or force 0 B mode via <code>window.PDPAssistantConfig = { mode: \'local-only\' }</code>.',
+            evidenceItemsSuffix: 'evidence items',
+            visibleDomFallback: 'visible DOM',
+            cartShort: 'Cart',
+            reviewsWord: 'reviews',
+            attributesWord: 'attributes',
+            ctxLabels: {
+              title: 'Title',
+              price: 'Price',
+              availability: 'Availability',
+              rating: 'Rating',
+              specs: 'Extracted Specs',
+              reviews: 'Reviews Indexed',
             },
-            sizes: ['XS', 'S', 'M', 'L', { label: 'XL', inStock: false }],
-            modelInfo: 'Manken boyu: 176 cm · Üzerindeki beden: S',
-            chips: [
-              'Hangi bedenler stokta var, XL var mı?',
-              'Mankenin üzerindeki beden ne?',
-              'Yaz düğününde terletir mi, iç gösterir mi?',
-              'Siyah rengi var mı?',
-            ],
+            intentPrefix: 'intent: ',
+            matchedWord: 'matched',
+            gateBanner: '<span>Payload if Cloud Fallback: <strong>0 bytes — Local NOT_FOUND Gate</strong></span><span>0 HTML · 0 cookies · 0 API spend</span>',
+            gateBoxTitle: 'No matching page evidence → Local NOT_FOUND Gate (0 bytes sent)',
+            gateBoxBody: function (q) {
+              return 'No attribute, spec, or review on this page supports "' + q + '". Stopped locally in 0 ms without calling /api/ask.'
+            },
+            payloadBanner: function (count, bytes) {
+              return '<span>Payload if Cloud Fallback: <strong>' + count + ' facts · ~' + bytes + ' bytes</strong></span><span>0 HTML · 0 cookies · 0 PII</span>'
+            },
+            scoreWord: 'score',
           },
         }
 
+        const LABELS_TR = {
+          'Product title': 'Ürün başlığı',
+          'Brand': 'Marka',
+          'Listed price': 'Liste fiyatı',
+          'Basket price': 'Sepet fiyatı',
+          'Basket discount': 'Sepet indirimi',
+          'Availability': 'Stok durumu',
+          'In-stock sizes': 'Stoktaki bedenler',
+          'Out-of-stock sizes': 'Tükenen bedenler',
+          'Available sizes': 'Beden seçenekleri',
+          'Selected size': 'Seçili beden',
+          'Color options': 'Renk seçenekleri',
+          'Model measurements': 'Manken ölçüleri',
+          'Description': 'Açıklama',
+          'Customer review': 'Müşteri yorumu',
+          'Average rating': 'Ortalama puan',
+          'Highlight': 'Öne çıkan',
+          'Visible page text': 'Sayfa metni',
+          'Promotion': 'Kampanya',
+        }
+
+        const PRODUCTS = {
+          tr: {
+            backpack: {
+              lang: 'tr',
+              theme: 'pack',
+              badge: 'Outdoor · Türkçe PDP Demo',
+              brand: 'Northwind Goods',
+              title: 'Terra Trail 28L Sırt Çantası',
+              priceText: '4.290 TL',
+              basketDiscount: '',
+              ratingText: '★ 4.8 / 5 · 3 yorum',
+              stockText: 'Stokta var — 1–2 iş gününde kargoda',
+              buyLabel: 'Sepete Ekle',
+              reviewsHeading: 'Müşteri Yorumları',
+              reviewsSub: '★ 4.8 / 5 (3 yorum)',
+              description: 'Uzun doğa yürüyüşleri ve şehir içi günlük kullanım için tasarlanmış suya dayanıklı sırt çantası. Havalandırmalı sırt paneli ve ergonomik omuz askıları yükü gün boyu dengeli taşır.',
+              svg: '<svg viewBox="0 0 128 128" fill="none" aria-hidden="true"><path d="M44 26c0-9 9-14 20-14s20 5 20 14" stroke="#173f2b" stroke-width="6" stroke-linecap="round"/><rect x="28" y="26" width="72" height="86" rx="22" fill="#173f2b"/><path d="M36 48c0-8 6-14 14-14h28c8 0 14 6 14 14v12H36V48Z" fill="#235b3f"/><rect x="42" y="68" width="44" height="30" rx="10" fill="#2d6e4c"/><path d="M56 54h16" stroke="#b9dfc7" stroke-width="4" stroke-linecap="round"/><path d="M48 76h32" stroke="#b9dfc7" stroke-width="3" stroke-linecap="round"/></svg>',
+              specs: [
+                ['Kapasite', '28 litre'],
+                ['Ağırlık', '980 g'],
+                ['Malzeme', 'Geri dönüştürülmüş ripstop naylon'],
+                ['Laptop Bölmesi', "16 inç'e kadar"],
+                ['Garanti', 'Ömür boyu onarım'],
+              ],
+              reviews: [
+                { rating: 5, author: 'Doğa yürüyüşçüsü', body: '18 km günübirlik yürüyüşlerde bile omuzlarda hafif hissettiriyor ve havalandırmalı sırt paneli terletmiyor.' },
+                { rating: 5, author: 'Günlük kullanıcı', body: '16 inç laptopum dolgulu bölmeye tam sığıyor, yağmurluk için de ekstra yer kalıyor.' },
+                { rating: 4, author: 'Hafta sonu kampçısı', body: 'Dayanıklı ripstop kumaşı yağmurlu parkurlarda güven veriyor. Bir adet ekstra yan cep olsaydı harika olurdu.' },
+              ],
+              jsonLd: {
+                '@context': 'https://schema.org',
+                '@type': 'Product',
+                name: 'Terra Trail 28L Sırt Çantası',
+                description: 'Uzun doğa yürüyüşleri ve şehir içi günlük kullanım için tasarlanmış suya dayanıklı sırt çantası. Havalandırmalı sırt paneli ve ergonomik omuz askıları yükü gün boyu dengeli taşır.',
+                sku: 'TTP-28-MOSS',
+                brand: { '@type': 'Brand', name: 'Northwind Goods' },
+                offers: { '@type': 'Offer', price: '4290.00', priceCurrency: 'TRY', availability: 'https://schema.org/InStock' },
+                aggregateRating: { '@type': 'AggregateRating', ratingValue: '4.8', reviewCount: '3' },
+                review: [
+                  { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: '18 km günübirlik yürüyüşlerde bile omuzlarda hafif hissettiriyor ve havalandırmalı sırt paneli terletmiyor.' },
+                  { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: '16 inç laptopum dolgulu bölmeye tam sığıyor, yağmurluk için de ekstra yer kalıyor.' },
+                  { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '4' }, reviewBody: 'Dayanıklı ripstop kumaşı yağmurlu parkurlarda güven veriyor. Bir adet ekstra yan cep olsaydı harika olurdu.' },
+                ],
+              },
+              chips: [
+                '16 inç MacBook sığar mı?',
+                'Ağırlığı ne kadar?',
+                'Müşteri yorumları nasıl?',
+                'Kırmızı rengi var mı?',
+              ],
+            },
+            shoe: {
+              lang: 'tr',
+              theme: 'shoe',
+              badge: 'Ayakkabı · Türkçe PDP Demo',
+              brand: 'AeroStride',
+              title: 'AeroStride Pro Koşu Ayakkabısı',
+              priceText: '3.499 TL',
+              basketDiscount: 'Sepette 2.999 TL',
+              ratingText: '★ 4.6 / 5 · 3 yorum',
+              stockText: 'Stokta var — 24 saat içinde kargoda',
+              buyLabel: 'Sepete Ekle',
+              reviewsHeading: 'Müşteri Yorumları',
+              reviewsSub: '★ 4.6 / 5 (3 yorum)',
+              description: 'Günlük tempo koşuları ve uzun mesafe antrenmanları için geliştirilen hafif koşu ayakkabısı. Çift yoğunluklu EVA orta taban darbe emilimi sağlarken nefes alan file saya ayağı serin tutar.',
+              svg: '<svg viewBox="0 0 128 128" fill="none" aria-hidden="true"><path d="M18 76c16 0 24-22 34-26l14 14c10 9 26 9 42 12 4 1 6 5 6 10v6H18V76Z" fill="#1b3a57"/><path d="M18 88h96v10c0 4-3 7-7 7H25c-4 0-7-3-7-7V88Z" fill="#e6eef7"/><path d="M50 56l18 14" stroke="#8ab4e1" stroke-width="4" stroke-linecap="round"/><path d="M40 66l14 10" stroke="#8ab4e1" stroke-width="4" stroke-linecap="round"/></svg>',
+              specs: [
+                ['Taban', 'EVA orta taban + Kauçuk dış taban'],
+                ['Kalıp', 'Tam kalıp'],
+                ['Ağırlık', '245 g (42 numara)'],
+                ['Üst Yüzey', 'Nefes alan mühendislik file'],
+                ['Topuk Dropu', '8 mm'],
+                ['Garanti', '2 Yıl üretici garantisi'],
+              ],
+              reviews: [
+                { rating: 5, author: 'Maraton koşucusu', body: 'Çok hafif ve yastıklaması dizleri yormuyor. Tam numara aldım tam oldu.' },
+                { rating: 4, author: 'Günlük koşucu', body: 'Nefes alan file yüzeyi yazın terletmiyor; ancak geniş taraklı ayaklarda yarım numara büyük tercih edilebilir.' },
+                { rating: 5, author: 'Doğrulanmış alıcı', body: 'Islak asfaltta kauçuk taban tutuşu gayet güven veriyor, kargo ertesi gün ulaştı.' },
+              ],
+              jsonLd: {
+                '@context': 'https://schema.org',
+                '@type': 'Product',
+                name: 'AeroStride Pro Koşu Ayakkabısı',
+                description: 'Günlük tempo koşuları ve uzun mesafe antrenmanları için geliştirilen hafif koşu ayakkabısı. Çift yoğunluklu EVA orta taban darbe emilimi sağlarken nefes alan file saya ayağı serin tutar.',
+                sku: 'ASP-RUN-42',
+                brand: { '@type': 'Brand', name: 'AeroStride' },
+                offers: { '@type': 'Offer', price: '3499', priceCurrency: 'TRY', availability: 'https://schema.org/InStock' },
+                aggregateRating: { '@type': 'AggregateRating', ratingValue: '4.6', reviewCount: '3' },
+                review: [
+                  { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'Çok hafif ve yastıklaması dizleri yormuyor. Tam numara aldım tam oldu.' },
+                  { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '4' }, reviewBody: 'Nefes alan file yüzeyi yazın terletmiyor; ancak geniş taraklı ayaklarda yarım numara büyük tercih edilebilir.' },
+                  { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'Islak asfaltta kauçuk taban tutuşu gayet güven veriyor, kargo ertesi gün ulaştı.' },
+                ],
+              },
+              sizeHeading: 'Numara Seçenekleri',
+              outOfStockTitle: 'Stokta yok',
+              sizes: ['40', '41', '42', '43', { label: '44', inStock: false }],
+              chips: [
+                'Hangi numaralar stokta var?',
+                'Geniş taraklı ayağa olur mu, kalıbı nasıl?',
+                'Sepette fiyatı ne kadar?',
+                'Kırmızı rengi var mı?',
+              ],
+            },
+            dress: {
+              lang: 'tr',
+              theme: 'dress',
+              badge: 'Giyim · Türkçe PDP Demo',
+              brand: 'Solis Atelier',
+              title: 'Solis %100 Keten Midi Elbise',
+              priceText: '2.190 TL',
+              basketDiscount: '',
+              ratingText: '★ 4.9 / 5 · 3 yorum',
+              stockText: 'Stokta var — aynı gün kargo',
+              buyLabel: 'Sepete Ekle',
+              reviewsHeading: 'Müşteri Yorumları',
+              reviewsSub: '★ 4.9 / 5 (3 yorum)',
+              description: 'Sıcak yaz günleri ve açık hava davetleri için tasarlanmış nefes alan %100 doğal keten midi elbise. İnce pamuklu iç astarı sayesinde iç göstermez ve rahat kesimiyle gün boyu konfor sunar.',
+              svg: '<svg viewBox="0 0 128 128" fill="none" aria-hidden="true"><path d="M48 22l16 10 16-10 8 20-10 6 14 58H36l14-58-10-6 8-20Z" fill="#5c4232"/><path d="M50 48h28" stroke="#e9d8ca" stroke-width="3" stroke-linecap="round"/></svg>',
+              specs: [
+                ['Kumaş', '%100 Doğal Keten'],
+                ['Kalıp', 'Rahat kesim'],
+                ['Boy', 'Midi (118 cm)'],
+                ['Astar', 'Pamuklu iç astar (iç göstermez)'],
+                ['Yıkama', '30°C hassas yıkama'],
+                ['Renk', 'Bej'],
+              ],
+              reviews: [
+                { rating: 5, author: 'Doğrulanmış alıcı', body: 'Yaz düğününde giydim, %100 keten olduğu için hiç terletmedi ve astarı sayesinde iç göstermiyor.' },
+                { rating: 5, author: 'Müşteri', body: 'Kalıbı rahat kesim, kendi bedeninizi alabilirsiniz. Doğal keten olduğu için ilk yıkamadan sonra hafif ütü istiyor.' },
+                { rating: 5, author: 'Müşteri', body: 'Bej rengi çok şık duruyor, 30 derecede hassas yıkamada çekme yapmadı.' },
+              ],
+              jsonLd: {
+                '@context': 'https://schema.org',
+                '@type': 'Product',
+                name: 'Solis %100 Keten Midi Elbise',
+                description: 'Sıcak yaz günleri ve açık hava davetleri için tasarlanmış nefes alan %100 doğal keten midi elbise. İnce pamuklu iç astarı sayesinde iç göstermez ve rahat kesimiyle gün boyu konfor sunar.',
+                sku: 'SLS-LINEN-BEJ',
+                brand: { '@type': 'Brand', name: 'Solis Atelier' },
+                offers: { '@type': 'Offer', price: '2190', priceCurrency: 'TRY', availability: 'https://schema.org/InStock' },
+                aggregateRating: { '@type': 'AggregateRating', ratingValue: '4.9', reviewCount: '3' },
+                review: [
+                  { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'Yaz düğününde giydim, %100 keten olduğu için hiç terletmedi ve astarı sayesinde iç göstermiyor.' },
+                  { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'Kalıbı rahat kesim, kendi bedeninizi alabilirsiniz. Doğal keten olduğu için ilk yıkamadan sonra hafif ütü istiyor.' },
+                  { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'Bej rengi çok şık duruyor, 30 derecede hassas yıkamada çekme yapmadı.' },
+                ],
+              },
+              sizeHeading: 'Beden Seçenekleri',
+              outOfStockTitle: 'Stokta yok',
+              sizes: ['XS', 'S', 'M', 'L', { label: 'XL', inStock: false }],
+              modelInfo: 'Manken boyu: 176 cm · Üzerindeki beden: S',
+              chips: [
+                'Hangi bedenler stokta var, XL var mı?',
+                'Mankenin üzerindeki beden ne?',
+                'Yaz düğününde terletir mi, iç gösterir mi?',
+                'Siyah rengi var mı?',
+              ],
+            },
+          },
+          en: {
+            backpack: {
+              lang: 'en',
+              theme: 'pack',
+              badge: 'Outdoor · EN PDP Demo',
+              brand: 'Northwind Goods',
+              title: 'Terra Trail Pack 28L',
+              priceText: '$129.00',
+              basketDiscount: '',
+              ratingText: '★ 4.8 / 5 · 3 reviews',
+              stockText: 'In stock — ships in 1–2 days',
+              buyLabel: 'Add to bag',
+              reviewsHeading: 'Customer Reviews',
+              reviewsSub: '★ 4.8 / 5 (3 reviews)',
+              description: 'A weather-resistant daypack built for long trails and short escapes. Ventilated back panel and contoured shoulder straps keep the load comfortable all day.',
+              svg: '<svg viewBox="0 0 128 128" fill="none" aria-hidden="true"><path d="M44 26c0-9 9-14 20-14s20 5 20 14" stroke="#173f2b" stroke-width="6" stroke-linecap="round"/><rect x="28" y="26" width="72" height="86" rx="22" fill="#173f2b"/><path d="M36 48c0-8 6-14 14-14h28c8 0 14 6 14 14v12H36V48Z" fill="#235b3f"/><rect x="42" y="68" width="44" height="30" rx="10" fill="#2d6e4c"/><path d="M56 54h16" stroke="#b9dfc7" stroke-width="4" stroke-linecap="round"/><path d="M48 76h32" stroke="#b9dfc7" stroke-width="3" stroke-linecap="round"/></svg>',
+              specs: [
+                ['Capacity', '28 litres'],
+                ['Weight', '980 g'],
+                ['Material', 'Recycled ripstop nylon'],
+                ['Laptop sleeve', 'Up to 16 inches'],
+                ['Warranty', 'Lifetime repairs'],
+              ],
+              reviews: [
+                { rating: 5, author: 'Verified hiker', body: 'Light on the shoulders even on 18 km day hikes, and the ventilated back panel stays comfortable.' },
+                { rating: 5, author: 'Daily commuter', body: 'Fits my 16-inch laptop neatly in the padded sleeve with room left for rain gear.' },
+                { rating: 4, author: 'Weekend camper', body: 'Tough ripstop fabric handles wet trail conditions well. Wish it had one extra side pocket.' },
+              ],
+              jsonLd: {
+                '@context': 'https://schema.org',
+                '@type': 'Product',
+                name: 'Terra Trail Pack 28L',
+                description: 'A weather-resistant daypack built for long trails and short escapes. Ventilated back panel and contoured shoulder straps keep the load comfortable all day.',
+                sku: 'TTP-28-MOSS',
+                brand: { '@type': 'Brand', name: 'Northwind Goods' },
+                offers: { '@type': 'Offer', price: '129.00', priceCurrency: 'USD', availability: 'https://schema.org/InStock' },
+                aggregateRating: { '@type': 'AggregateRating', ratingValue: '4.8', reviewCount: '3' },
+                review: [
+                  { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'Light on the shoulders even on 18 km day hikes, and the ventilated back panel stays comfortable.' },
+                  { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'Fits my 16-inch laptop neatly in the padded sleeve with room left for rain gear.' },
+                  { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '4' }, reviewBody: 'Tough ripstop fabric handles wet trail conditions well. Wish it had one extra side pocket.' },
+                ],
+              },
+              chips: [
+                'Can it fit a 16-inch MacBook?',
+                'How heavy is this backpack?',
+                'What do customer reviews say?',
+                'Does it come in red?',
+              ],
+            },
+            shoe: {
+              lang: 'en',
+              theme: 'shoe',
+              badge: 'Footwear · EN PDP Demo',
+              brand: 'AeroStride',
+              title: 'AeroStride Pro Running Shoe',
+              priceText: '$119.00',
+              basketDiscount: 'In cart $99.00',
+              ratingText: '★ 4.6 / 5 · 3 reviews',
+              stockText: 'In stock — ships within 24 hours',
+              buyLabel: 'Add to bag',
+              reviewsHeading: 'Customer Reviews',
+              reviewsSub: '★ 4.6 / 5 (3 reviews)',
+              description: 'Lightweight running shoe engineered for daily tempo runs and long-distance training. A dual-density EVA midsole absorbs impact while the breathable engineered mesh upper keeps your feet cool.',
+              svg: '<svg viewBox="0 0 128 128" fill="none" aria-hidden="true"><path d="M18 76c16 0 24-22 34-26l14 14c10 9 26 9 42 12 4 1 6 5 6 10v6H18V76Z" fill="#1b3a57"/><path d="M18 88h96v10c0 4-3 7-7 7H25c-4 0-7-3-7-7V88Z" fill="#e6eef7"/><path d="M50 56l18 14" stroke="#8ab4e1" stroke-width="4" stroke-linecap="round"/><path d="M40 66l14 10" stroke="#8ab4e1" stroke-width="4" stroke-linecap="round"/></svg>',
+              specs: [
+                ['Sole', 'EVA midsole + Rubber outsole'],
+                ['Fit', 'True to size'],
+                ['Weight', '245 g (Size 42)'],
+                ['Upper', 'Breathable engineered mesh'],
+                ['Heel Drop', '8 mm'],
+                ['Warranty', '2-year manufacturer warranty'],
+              ],
+              reviews: [
+                { rating: 5, author: 'Marathon runner', body: 'Very lightweight and the cushioning stays gentle on the knees. Ordered true to size and it fit right away.' },
+                { rating: 4, author: 'Daily runner', body: 'Breathable mesh upper keeps feet cool in summer; for wide feet, sizing up by half a size may feel more comfortable.' },
+                { rating: 5, author: 'Verified buyer', body: 'Rubber outsole grips wet asphalt reliably, and shipping arrived the next day.' },
+              ],
+              jsonLd: {
+                '@context': 'https://schema.org',
+                '@type': 'Product',
+                name: 'AeroStride Pro Running Shoe',
+                description: 'Lightweight running shoe engineered for daily tempo runs and long-distance training. A dual-density EVA midsole absorbs impact while the breathable engineered mesh upper keeps your feet cool.',
+                sku: 'ASP-RUN-42',
+                brand: { '@type': 'Brand', name: 'AeroStride' },
+                offers: { '@type': 'Offer', price: '119.00', priceCurrency: 'USD', availability: 'https://schema.org/InStock' },
+                aggregateRating: { '@type': 'AggregateRating', ratingValue: '4.6', reviewCount: '3' },
+                review: [
+                  { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'Very lightweight and the cushioning stays gentle on the knees. Ordered true to size and it fit right away.' },
+                  { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '4' }, reviewBody: 'Breathable mesh upper keeps feet cool in summer; for wide feet, sizing up by half a size may feel more comfortable.' },
+                  { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'Rubber outsole grips wet asphalt reliably, and shipping arrived the next day.' },
+                ],
+              },
+              sizeHeading: 'Available Sizes',
+              outOfStockTitle: 'Out of stock',
+              sizes: ['40', '41', '42', '43', { label: '44', inStock: false }],
+              chips: [
+                'Which sizes are in stock?',
+                'Does it fit wide feet?',
+                'What is the cart price?',
+                'Does it come in red?',
+              ],
+            },
+            dress: {
+              lang: 'en',
+              theme: 'dress',
+              badge: 'Apparel · EN PDP Demo',
+              brand: 'Solis Atelier',
+              title: 'Solis 100% Linen Midi Dress',
+              priceText: '$79.00',
+              basketDiscount: '',
+              ratingText: '★ 4.9 / 5 · 3 reviews',
+              stockText: 'In stock — same-day shipping',
+              buyLabel: 'Add to bag',
+              reviewsHeading: 'Customer Reviews',
+              reviewsSub: '★ 4.9 / 5 (3 reviews)',
+              description: 'Breathable 100% natural linen midi dress designed for warm summer days and outdoor events. A soft cotton inner lining ensures opaque coverage with a relaxed cut for all-day comfort.',
+              svg: '<svg viewBox="0 0 128 128" fill="none" aria-hidden="true"><path d="M48 22l16 10 16-10 8 20-10 6 14 58H36l14-58-10-6 8-20Z" fill="#5c4232"/><path d="M50 48h28" stroke="#e9d8ca" stroke-width="3" stroke-linecap="round"/></svg>',
+              specs: [
+                ['Fabric', '100% Natural Linen'],
+                ['Fit', 'Relaxed fit'],
+                ['Length', 'Midi (118 cm)'],
+                ['Lining', 'Cotton inner lining (opaque)'],
+                ['Care', '30°C gentle wash'],
+                ['Color', 'Beige'],
+              ],
+              reviews: [
+                { rating: 5, author: 'Verified buyer', body: 'Wore it to a summer wedding — 100% linen stayed cool and the lining prevented any sheerness.' },
+                { rating: 5, author: 'Customer', body: 'Relaxed fit, you can order your usual size. Since it is natural linen, it benefits from a light steam after the first wash.' },
+                { rating: 5, author: 'Customer', body: 'The beige tone looks elegant and it did not shrink on a 30°C gentle cycle.' },
+              ],
+              jsonLd: {
+                '@context': 'https://schema.org',
+                '@type': 'Product',
+                name: 'Solis 100% Linen Midi Dress',
+                description: 'Breathable 100% natural linen midi dress designed for warm summer days and outdoor events. A soft cotton inner lining ensures opaque coverage with a relaxed cut for all-day comfort.',
+                sku: 'SLS-LINEN-BEJ',
+                brand: { '@type': 'Brand', name: 'Solis Atelier' },
+                offers: { '@type': 'Offer', price: '79.00', priceCurrency: 'USD', availability: 'https://schema.org/InStock' },
+                aggregateRating: { '@type': 'AggregateRating', ratingValue: '4.9', reviewCount: '3' },
+                review: [
+                  { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'Wore it to a summer wedding — 100% linen stayed cool and the lining prevented any sheerness.' },
+                  { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'Relaxed fit, you can order your usual size. Since it is natural linen, it benefits from a light steam after the first wash.' },
+                  { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'The beige tone looks elegant and it did not shrink on a 30°C gentle cycle.' },
+                ],
+              },
+              sizeHeading: 'Available Sizes',
+              outOfStockTitle: 'Out of stock',
+              sizes: ['XS', 'S', 'M', 'L', { label: 'XL', inStock: false }],
+              modelInfo: 'Model is 176 cm tall · Wearing size S',
+              chips: [
+                'Which sizes are in stock, is XL available?',
+                'What size is the model wearing?',
+                'Is it breathable and opaque for summer?',
+                'Does it come in black?',
+              ],
+            },
+          },
+        }
+
+        function resolveInitialLang() {
+          try {
+            const urlLang = (new URLSearchParams(window.location.search).get('lang') || '').toLowerCase()
+            if (urlLang === 'tr' || urlLang === 'en') return urlLang
+          } catch {}
+          try {
+            const saved = (localStorage.getItem(LANG_STORAGE_KEY) || '').toLowerCase()
+            if (saved === 'tr' || saved === 'en') return saved
+          } catch {}
+          return (navigator.language || '').toLowerCase().startsWith('tr') ? 'tr' : 'en'
+        }
+
+        let currentLang = resolveInitialLang()
+        let currentProductKey = 'backpack'
+
+        const metaDescEl = document.querySelector('meta[name="description"]')
+        const productSwitcherEl = document.getElementById('product-switcher')
+        const langSwitchGroupEl = document.querySelector('.lang-switch')
+        const langButtons = Array.from(document.querySelectorAll('.lang-btn'))
+        const eyebrowEl = document.getElementById('inspector-eyebrow')
+        const inspectorTitleEl = document.getElementById('inspector-title')
+        const inspectorDescEl = document.getElementById('inspector-desc')
         const tierBadge = document.getElementById('cap-tier')
+        const privacyBadge = document.getElementById('cap-privacy')
+        const inputEl = document.getElementById('inspector-question')
+        const submitBtn = document.getElementById('inspector-submit')
+        const panelCtxTitleEl = document.getElementById('panel-ctx-title')
+        const panelRetTitleEl = document.getElementById('panel-ret-title')
+        const snippetTitleEl = document.getElementById('snippet-title')
+        const copyBtn = document.getElementById('copy-snippet')
+        const archBoxEl = document.getElementById('arch-box')
+
         const ctxSourceBadge = document.getElementById('ctx-source-badge')
         const ctxSummary = document.getElementById('ctx-summary')
         const intentBadge = document.getElementById('retrieval-intent-badge')
         const resultsEl = document.getElementById('retrieval-results')
         const payloadBanner = document.getElementById('payload-banner')
-        const inputEl = document.getElementById('inspector-question')
         const chipsContainer = document.getElementById('inspector-chips')
         const productRoot = document.getElementById('product-root')
         const jsonLdEl = document.getElementById('product-jsonld')
@@ -397,8 +694,50 @@
           return span.innerHTML
         }
 
+        function localizeEvidenceLabel(label, lang) {
+          if (!label || lang !== 'tr') return label || ''
+          const match = label.match(/^Customer review(?:\s*(\([^)]+\)))?$/i)
+          if (match) return 'Müşteri yorumu' + (match[1] ? ' ' + match[1] : '')
+          return LABELS_TR[label] || label
+        }
+
+        function applyStaticTranslations(lang) {
+          const t = I18N[lang]
+          document.documentElement.lang = lang
+          document.title = t.pageTitle
+          if (metaDescEl) metaDescEl.setAttribute('content', t.metaDesc)
+          if (productSwitcherEl) productSwitcherEl.setAttribute('aria-label', t.switcherLabel)
+          if (langSwitchGroupEl) langSwitchGroupEl.setAttribute('aria-label', t.langSwitchLabel)
+
+          productTabs.forEach(function (tab) {
+            const key = tab.dataset.product
+            if (key && t.tabs[key]) tab.textContent = t.tabs[key]
+          })
+          langButtons.forEach(function (btn) {
+            const active = btn.dataset.lang === lang
+            btn.classList.toggle('active', active)
+            btn.setAttribute('aria-pressed', String(active))
+          })
+
+          eyebrowEl.textContent = t.eyebrow
+          inspectorTitleEl.textContent = t.title
+          inspectorDescEl.innerHTML = t.desc
+          tierBadge.textContent = t.capReady
+          tierBadge.dataset.state = 'ready'
+          privacyBadge.textContent = t.capPrivacy
+          inputEl.placeholder = t.inputPlaceholder
+          inputEl.setAttribute('aria-label', t.inputAriaLabel)
+          submitBtn.textContent = t.submitBtn
+          panelCtxTitleEl.textContent = t.panelCtxTitle
+          panelRetTitleEl.textContent = t.panelRetTitle
+          snippetTitleEl.textContent = t.snippetTitle
+          copyBtn.textContent = t.copyBtn
+          archBoxEl.innerHTML = t.archHtml
+        }
+
         function renderProduct(key) {
-          const p = PRODUCTS[key] || PRODUCTS.backpack
+          currentProductKey = key && PRODUCTS[currentLang][key] ? key : 'backpack'
+          const p = PRODUCTS[currentLang][currentProductKey]
           document.documentElement.lang = p.lang
           jsonLdEl.textContent = JSON.stringify(p.jsonLd)
 
@@ -406,14 +745,14 @@
             return '<li><span>' + esc(pair[0]) + '</span><strong>' + esc(pair[1]) + '</strong></li>'
           }).join('')
           const sizesHtml = Array.isArray(p.sizes) && p.sizes.length
-            ? '<div class="size-section" aria-label="' + esc(p.theme === 'shoe' ? 'Numara Seçenekleri' : 'Beden Seçenekleri') + '">' +
-                '<div class="size-label">' + esc(p.theme === 'shoe' ? 'Numara Seçenekleri' : 'Beden Seçenekleri') + '</div>' +
+            ? '<div class="size-section" aria-label="' + esc(p.sizeHeading || '') + '">' +
+                '<div class="size-label">' + esc(p.sizeHeading || '') + '</div>' +
                 '<ul class="size-list">' +
                 p.sizes.map(function (item) {
                   const label = typeof item === 'string' ? item : item.label
                   const inStock = typeof item === 'string' ? true : item.inStock !== false
                   return '<li><button type="button" class="size-btn"' +
-                    (inStock ? '' : ' disabled title="Stokta yok"') +
+                    (inStock ? '' : ' disabled title="' + esc(p.outOfStockTitle || 'Out of stock') + '"') +
                     '>' + esc(label) + '</button></li>'
                 }).join('') +
                 '</ul>' +
@@ -466,7 +805,7 @@
 
           inputEl.value = p.chips[0] || ''
           productTabs.forEach(function (tab) {
-            const active = tab.dataset.product === key
+            const active = tab.dataset.product === currentProductKey
             tab.classList.toggle('active', active)
             tab.setAttribute('aria-selected', String(active))
           })
@@ -475,49 +814,59 @@
           renderInspector(inputEl.value)
         }
 
-        function detectCapabilities() {
-          tierBadge.textContent = 'Zero-Download · Works Everywhere'
-          tierBadge.dataset.state = 'ready'
+        function setLanguage(lang, syncUrl) {
+          currentLang = lang === 'en' ? 'en' : 'tr'
+          try { localStorage.setItem(LANG_STORAGE_KEY, currentLang) } catch {}
+          if (syncUrl !== false) {
+            try {
+              const nextUrl = new URL(window.location.href)
+              nextUrl.searchParams.set('lang', currentLang)
+              history.replaceState(null, '', nextUrl.toString())
+            } catch {}
+          }
+          applyStaticTranslations(currentLang)
+          renderProduct(currentProductKey)
         }
 
         function renderInspector(question) {
           const api = window.PDPAssistant
           if (!api || !api.debugContext || !api.debugEvidenceIndex || !api.debugRetrieveEvidence) return
 
+          const t = I18N[currentLang]
           const ctx = api.debugContext()
           const index = api.debugEvidenceIndex()
           const q = (question || inputEl.value || '').trim()
           const intent = api.detectIntent ? api.detectIntent(q) : 'unknown'
           const matched = api.debugRetrieveEvidence(q)
 
-          const sources = (ctx.dataSource && ctx.dataSource.length) ? ctx.dataSource.join(' + ') : 'visible dom'
-          ctxSourceBadge.textContent = sources + ' · ' + index.length + ' evidence items'
+          const sources = (ctx.dataSource && ctx.dataSource.length) ? ctx.dataSource.join(' + ') : t.visibleDomFallback
+          ctxSourceBadge.textContent = sources + ' · ' + index.length + ' ' + t.evidenceItemsSuffix
 
           const priceDisplay = ctx.basketPrice
-            ? ctx.listedPrice + ' (Sepet: ' + ctx.basketPrice + ')'
+            ? ctx.listedPrice + ' (' + t.cartShort + ': ' + ctx.basketPrice + ')'
             : (ctx.listedPrice || '—')
 
           const rows = [
-            ['Title', ctx.title || '—'],
-            ['Price (' + (ctx.priceSource || 'dom') + ')', priceDisplay],
-            ['Availability', ctx.availability || '—'],
-            ['Rating', ctx.rating ? ctx.rating + ' / 5 (' + (ctx.reviewCount || 0) + ' reviews)' : '—'],
-            ['Extracted Specs', Object.keys(ctx.specs || {}).length + ' attributes'],
-            ['Reviews Indexed', String((ctx.reviews || []).length)],
+            [t.ctxLabels.title, ctx.title || '—'],
+            [t.ctxLabels.price + ' (' + (ctx.priceSource || 'dom') + ')', priceDisplay],
+            [t.ctxLabels.availability, ctx.availability || '—'],
+            [t.ctxLabels.rating, ctx.rating ? ctx.rating + ' / 5 (' + (ctx.reviewCount || 0) + ' ' + t.reviewsWord + ')' : '—'],
+            [t.ctxLabels.specs, Object.keys(ctx.specs || {}).length + ' ' + t.attributesWord],
+            [t.ctxLabels.reviews, String((ctx.reviews || []).length)],
           ]
           ctxSummary.innerHTML = rows.map(function (r) {
             return '<div class="ctx-row"><span>' + esc(r[0]) + '</span><strong>' + esc(r[1]) + '</strong></div>'
           }).join('')
 
-          intentBadge.textContent = 'intent: ' + intent + ' · ' + matched.length + ' / ' + index.length + ' matched'
+          intentBadge.textContent = t.intentPrefix + intent + ' · ' + matched.length + ' / ' + index.length + ' ' + t.matchedWord
 
           if (!matched.length) {
             payloadBanner.dataset.gate = 'true'
-            payloadBanner.innerHTML = '<span>Payload if Cloud Fallback: <strong>0 bytes — Local NOT_FOUND Gate</strong></span><span>0 HTML · 0 cookies · 0 API spend</span>'
+            payloadBanner.innerHTML = t.gateBanner
             resultsEl.innerHTML =
               '<div class="not-found-box">' +
-              '<strong>No matching page evidence → Local NOT_FOUND Gate (0 bytes sent)</strong>' +
-              'No attribute, spec, or review on this page supports "' + esc(q) + '". Stopped locally in 0 ms without calling /api/ask.' +
+              '<strong>' + esc(t.gateBoxTitle) + '</strong>' +
+              esc(t.gateBoxBody(q)) +
               '</div>'
             return
           }
@@ -533,14 +882,15 @@
           })).length
 
           payloadBanner.dataset.gate = 'false'
-          payloadBanner.innerHTML = '<span>Payload if Cloud Fallback: <strong>' + topEvidence.length + ' facts · ~' + approxBytes + ' bytes</strong></span><span>0 HTML · 0 cookies · 0 PII</span>'
+          payloadBanner.innerHTML = t.payloadBanner(topEvidence.length, approxBytes)
 
           resultsEl.innerHTML = matched.slice(0, 5).map(function (item) {
+            const displayLabel = localizeEvidenceLabel(item.label, currentLang)
             return (
               '<div class="evidence-item">' +
                 '<div class="evidence-meta">' +
-                  '<span>' + esc(item.type.toUpperCase()) + (item.label ? ' · ' + esc(item.label) : '') + ' (' + esc(item.source) + ')</span>' +
-                  '<span class="evidence-score">score ' + esc(item.score ?? 0) + '</span>' +
+                  '<span>' + esc(item.type.toUpperCase()) + (displayLabel ? ' · ' + esc(displayLabel) : '') + ' (' + esc(item.source) + ')</span>' +
+                  '<span class="evidence-score">' + esc(t.scoreWord) + ' ' + esc(item.score ?? 0) + '</span>' +
                 '</div>' +
                 '<div class="evidence-val">' + esc(item.value) + '</div>' +
               '</div>'
@@ -562,6 +912,12 @@
           })
         })
 
+        langButtons.forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            setLanguage(btn.dataset.lang || 'tr', true)
+          })
+        })
+
         document.getElementById('inspector-form').addEventListener('submit', function (e) {
           e.preventDefault()
           Array.from(chipsContainer.querySelectorAll('.q-chip')).forEach(function (btn) {
@@ -575,15 +931,15 @@
           const text = document.getElementById('inject-snippet').textContent || ''
           try {
             await navigator.clipboard.writeText(text)
-            btn.textContent = 'Copied!'
-            setTimeout(function () { btn.textContent = 'Copy snippet' }, 1400)
+            btn.textContent = I18N[currentLang].copiedBtn
+            setTimeout(function () { btn.textContent = I18N[currentLang].copyBtn }, 1400)
           } catch {}
         })
 
-        renderProduct('backpack')
+        setLanguage(currentLang, false)
 
         function init() {
-          detectCapabilities()
+          applyStaticTranslations(currentLang)
           renderInspector(inputEl.value)
         }
 
