@@ -3,9 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="description" content="3-category live demo storefront and Pipeline Inspector for Private PDP Assistant — a local-first 3-tier hybrid e-commerce AI widget." />
+    <meta name="description" content="3-category live demo storefront and Pipeline Inspector for Private PDP Assistant — a privacy-first local-retrieval AI product widget." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>Private PDP Assistant — 3-Category Hybrid E-Commerce Demo</title>
+    <title>Private PDP Assistant — Privacy-First Local-Retrieval AI Demo</title>
     <style>
       :root{--bg:#f5f2ea;--surface:#fffdf9;--ink:#183126;--muted:#53645b;--line:#d5ddd7;--brand:#173f2b;--accent:#257246}
       *{box-sizing:border-box}
@@ -159,15 +159,15 @@
       <div class="inspector-shell">
         <div class="inspector-top">
           <div>
-            <div class="inspector-eyebrow">Local-First 3-Tier Hybrid Architecture · Live Diagnostics</div>
+            <div class="inspector-eyebrow">Privacy-First Local Retrieval + Minimized Cloud · Live Diagnostics</div>
             <h2>Live Extraction &amp; Minimized Cloud Payload Inspector</h2>
             <p>
-              Every browser extracts Schema.org JSON-LD and DOM context locally. If Chrome Gemini Nano is already available locally, answers cost <strong>$0 / 0 B</strong>. Otherwise, only the matched facts below (~150 tokens, zero HTML) go to <code>/api/ask</code> — and unsupported questions stop locally at <strong>0 bytes</strong>.
+              Every browser extracts Schema.org JSON-LD, specs, and reviews locally (zero HTML, zero cookies, zero PII sent). Out-of-page questions stop at <strong>0 bytes</strong> locally, while answered queries send only <strong>1–8 matched facts</strong> (~200–1,100 B) + 2-turn follow-up context to <code>/api/ask</code>.
             </p>
           </div>
           <div class="caps">
-            <span id="cap-tier" class="cap-pill" data-state="hybrid">Tier 2 Hybrid: Active (0 MB download)</span>
-            <span class="cap-pill" data-state="ready">Architecture: 3-Tier Local-First</span>
+            <span id="cap-tier" class="cap-pill" data-state="ready">Zero-Download · Works Everywhere</span>
+            <span class="cap-pill" data-state="hybrid">Privacy: 0 HTML · 0 PII · 0 B Gate</span>
           </div>
         </div>
 
@@ -208,8 +208,8 @@
             <pre id="inject-snippet">(()=>{const s=document.createElement('script');s.src='https://private-pdp-assistant.vercel.app/private-pdp-assistant.js';s.onerror=()=>console.warn('[PDP Assistant] Blocked by this site CSP.');document.head.append(s)})()</pre>
           </div>
           <div class="flags-box">
-            <strong>3-Tier Fallback Guarantee (Zero 1.5 GB Forced Download)</strong>
-            <strong>1) On-Device Nano</strong> (used only when already <code>available</code>) → <strong>2) Minimized Cloud</strong> (<code>/api/ask</code> Gemini → Groq → OpenRouter with matched facts only) → <strong>3) Offline Local</strong> (category-agnostic extractive fallback). Override via <code>window.PDPAssistantConfig = { mode: 'local-only' }</code>.
+            <strong>Architecture Decision: Local Retrieval + Minimized Cloud</strong>
+            On-device Gemini Nano requires a ~1.5 GB Chrome-only download and degraded on Turkish reasoning, so retrieval &amp; filtering stay 100% local while only matched facts go to <code>/api/ask</code> (<code>Gemini → Groq → OpenRouter</code>). Offline fallback is automatic, or force 0 B mode via <code>window.PDPAssistantConfig = { mode: 'local-only' }</code>.
           </div>
         </div>
       </div>
@@ -447,19 +447,9 @@
           renderInspector(inputEl.value)
         }
 
-        async function detectCapabilities() {
-          try {
-            if (window.LanguageModel && typeof window.LanguageModel.availability === 'function') {
-              const status = await window.LanguageModel.availability()
-              if (status === 'available') {
-                tierBadge.textContent = 'Tier 1 On-Device: Ready ($0)'
-                tierBadge.dataset.state = 'ready'
-                return
-              }
-            }
-          } catch {}
-          tierBadge.textContent = 'Tier 2 Hybrid: Active (0 MB download)'
-          tierBadge.dataset.state = 'hybrid'
+        function detectCapabilities() {
+          tierBadge.textContent = 'Zero-Download · Works Everywhere'
+          tierBadge.dataset.state = 'ready'
         }
 
         function renderInspector(question) {
@@ -499,7 +489,7 @@
             resultsEl.innerHTML =
               '<div class="not-found-box">' +
               '<strong>No matching page evidence → Local NOT_FOUND Gate (0 bytes sent)</strong>' +
-              'No attribute, spec, or review on this page supports "' + esc(q) + '". Stopped locally in 0 ms without calling Gemini Nano or /api/ask.' +
+              'No attribute, spec, or review on this page supports "' + esc(q) + '". Stopped locally in 0 ms without calling /api/ask.' +
               '</div>'
             return
           }

@@ -5,22 +5,14 @@ import {
   requestCloudAnswer,
   resolveApiEndpoint,
 } from './fallback'
-import {
-  answerQuestion,
-  createSession,
-  isNanoReadyImmediately,
-  isTurkishText,
-  prepareQuestionEvidence,
-} from './nano'
+import { isTurkishText, prepareQuestionEvidence } from './retrieval'
 import { styles } from './styles'
-import { createTurkishBridge } from './translation'
-import type { AnswerLanguageBridge } from './translation'
-import type { LanguageModelSession, ProductContext } from './types'
+import type { ChatTurn, ProductContext } from './types'
 
 const robotIcon = `<svg viewBox="0 0 24 24" aria-hidden="true" class="pdp-robot-icon"><path d="M12 3v3"/><circle cx="12" cy="3" r="1"/><rect x="4.5" y="6" width="15" height="12.5" rx="4"/><path d="M4.5 11H3m18 0h-1.5M9 15h6"/><circle cx="9" cy="11.5" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="11.5" r="1" fill="currentColor" stroke="none"/></svg>`
 const sendIcon = `<svg viewBox="0 0 24 24" fill="none"><path d="m4 12 16-8-6 16-2.6-5.4L4 12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`
 
-type RuntimeMode = 'nano' | 'hybrid' | 'offline'
+type RuntimeMode = 'hybrid' | 'offline'
 
 function buildKeyFacts(context: ProductContext): string[] {
   const facts: string[] = []
@@ -52,18 +44,13 @@ export class AssistantWidget {
   private host: HTMLDivElement
   private root: ShadowRoot
   private scriptOrigin?: string
-  private session?: LanguageModelSession
   private abort?: AbortController
-  private initAbort?: AbortController
-  private languageBridge?: AnswerLanguageBridge
   private sessionProductKey?: string
-  private sessionTurns = 0
   private ready = false
-  private nanoStubDetected = false
   private currentRuntime: RuntimeMode = 'hybrid'
   private busy = false
-  private initializing = false
   private disposed = false
+  private history: ChatTurn[] = []
   private suggestedQuestions: string[] = []
   private suggestionDrag?: {
     pointerId: number
@@ -85,7 +72,7 @@ export class AssistantWidget {
     this.root.innerHTML = `<style>${styles}</style>
       <button class="pdp-launcher" aria-label="Open product assistant" aria-expanded="false" aria-controls="pdp-assistant-panel">${robotIcon}<span class="pdp-launcher-ring"></span></button>
       <section id="pdp-assistant-panel" class="pdp-panel pdp-hidden" role="dialog" aria-modal="true" aria-label="Product assistant">
-        <header class="pdp-header"><div class="pdp-mark">${robotIcon}</div><div class="pdp-heading"><strong>Private PDP Assist</strong><span class="pdp-header-sub"><i class="pdp-dot"></i> Local-first product assistant</span></div><button class="pdp-icon pdp-close" aria-label="Close"><span aria-hidden="true">×</span></button></header>
+        <header class="pdp-header"><div class="pdp-mark">${robotIcon}</div><div class="pdp-heading"><strong>Private PDP Assist</strong><span class="pdp-header-sub"><i class="pdp-dot"></i> Local-retrieval product assistant</span></div><button class="pdp-icon pdp-close" aria-label="Close"><span aria-hidden="true">×</span></button></header>
         <main class="pdp-body" aria-live="polite"></main>
         <footer class="pdp-composer pdp-hidden"><div class="pdp-suggestions" aria-label="Suggested questions"></div><form class="pdp-form"><input aria-label="Ask about this product" placeholder="Ask about this product…" maxlength="500" autocomplete="off"><button class="pdp-send" aria-label="Send" disabled>${sendIcon}</button></form><div class="pdp-privacy">Local retrieval · Only matched facts leave device when cloud needed</div></footer>
       </section>`
@@ -95,10 +82,6 @@ export class AssistantWidget {
   unmount(): void {
     this.disposed = true
     this.abort?.abort()
-    this.initAbort?.abort()
-    this.destroyBaseSession()
-    this.languageBridge?.destroy()
-    this.languageBridge = undefined
     this.host.remove()
   }
 
@@ -127,16 +110,6 @@ export class AssistantWidget {
     }
   }
 
-  private destroyBaseSession(): void {
-    try {
-      this.session?.destroy()
-    } catch {
-      // Ignore already-destroyed session handles.
-    }
-    this.session = undefined
-    this.sessionTurns = 0
-  }
-
   private bind(): void {
     const launcher = this.q<HTMLButtonElement>('.pdp-launcher')
     const panel = this.q<HTMLElement>('.pdp-panel')
@@ -146,7 +119,7 @@ export class AssistantWidget {
       if (open) {
         this.q<HTMLButtonElement>('.pdp-close').focus()
         if (!this.ready) {
-          void this.initialize()
+          this.initialize()
         } else {
           const context = extractProductContext()
           if (hasProductContext(context) && this.productKey(context) !== this.sessionProductKey) {
@@ -263,9 +236,7 @@ export class AssistantWidget {
     void this.ask(question)
   }
 
-  private async initialize(): Promise<void> {
-    if (this.initializing) return
-    this.initializing = true
+  private initialize(): void {
     try {
       const context = extractProductContext()
       if (!hasProductContext(context)) {
@@ -274,89 +245,15 @@ export class AssistantWidget {
         return
       }
 
-      // Opportunistic Tier 1: only initialize Gemini Nano when already downloaded
-      // ('available'). Never trigger a 1.5 GB background download on shoppers.
-      this.destroyBaseSession()
-      if (!this.nanoStubDetected && await isNanoReadyImmediately()) {
-        try {
-          this.initAbort = new AbortController()
-          const session = await createSession(() => undefined, this.initAbort.signal)
-          if (this.disposed) {
-            session.destroy()
-            return
-          }
-          this.session = session
-        } catch {
-          this.destroyBaseSession()
-        }
-      }
-
-      this.currentRuntime = this.session
-        ? 'nano'
-        : getAssistantMode() === 'local-only'
-          ? 'offline'
-          : 'hybrid'
+      this.currentRuntime = getAssistantMode() === 'local-only' ? 'offline' : 'hybrid'
       this.sessionProductKey = this.productKey(context)
-      this.sessionTurns = 0
+      this.history = []
       this.ready = true
       this.showReady(context)
     } catch (error) {
       if (this.disposed) return
       console.error('[PDP Assistant]', error)
       this.showState('error', 'Unexpected error', 'The assistant could not start. Please try again.', true)
-    } finally {
-      this.initAbort = undefined
-      this.initializing = false
-    }
-  }
-
-  private async runTurnPrompt(
-    context: ProductContext,
-    question: string,
-    bridge: AnswerLanguageBridge | undefined,
-    translateOutput: boolean,
-    signal: AbortSignal,
-    maxEvidenceItems?: number,
-  ): Promise<string> {
-    if (!this.session) {
-      this.session = await createSession()
-      this.sessionTurns = 0
-    }
-
-    let turnSession = this.session
-    let isEphemeral = false
-
-    if (typeof this.session.clone === 'function') {
-      turnSession = await this.session.clone({ signal })
-      isEphemeral = true
-    } else if (this.sessionTurns > 0) {
-      this.destroyBaseSession()
-      this.session = await createSession()
-      turnSession = this.session
-    }
-
-    try {
-      const answer = await answerQuestion(
-        turnSession,
-        context,
-        question,
-        signal,
-        bridge,
-        translateOutput,
-        maxEvidenceItems,
-      )
-      if (!isEphemeral) {
-        this.sessionTurns += 1
-      }
-      return answer
-    } finally {
-      if (isEphemeral) {
-        try {
-          turnSession.destroy()
-        } catch {
-          // Ignore clone cleanup failures.
-        }
-      }
     }
   }
 
@@ -379,7 +276,7 @@ export class AssistantWidget {
       this.showReady(context, false)
     }
 
-    const prepared = prepareQuestionEvidence(context, question)
+    const prepared = prepareQuestionEvidence(context, question, undefined, this.history)
     const isTurkish = prepared.isTurkish || this.contextNeedsTurkish(context)
 
     input.value = ''
@@ -408,54 +305,8 @@ export class AssistantWidget {
       let answerText: string | undefined
       let answerMeta = ''
 
-      // Tier 1: Opportunistic On-Device Gemini Nano (when already available locally)
-      if (this.session && !this.nanoStubDetected) {
-        try {
-          let bridge = this.languageBridge
-          if (isTurkish && !bridge) {
-            bridge = await createTurkishBridge(() => undefined, this.abort.signal)
-            this.languageBridge = bridge
-          }
-          try {
-            answerText = await this.runTurnPrompt(
-              context,
-              question,
-              isTurkish ? bridge : undefined,
-              prepared.isTurkish,
-              this.abort.signal,
-            )
-          } catch (firstErr) {
-            if (firstErr instanceof DOMException && firstErr.name === 'QuotaExceededError') {
-              this.destroyBaseSession()
-              this.session = await createSession()
-              answerText = await this.runTurnPrompt(
-                context,
-                question,
-                isTurkish ? bridge : undefined,
-                prepared.isTurkish,
-                this.abort.signal,
-                2,
-              )
-            } else {
-              throw firstErr
-            }
-          }
-          answerMeta = isTurkish
-            ? 'Cihaz İçi Gemini Nano · 0 B gönderildi'
-            : 'On-Device Nano · 0 B sent'
-        } catch (nanoErr) {
-          if ((nanoErr as DOMException)?.name === 'AbortError') throw nanoErr
-          if (nanoErr instanceof DOMException && (nanoErr.name === 'NotSupportedError' || nanoErr.name === 'QuotaExceededError')) {
-            this.nanoStubDetected = true
-          }
-          this.destroyBaseSession()
-          this.currentRuntime = getAssistantMode() === 'local-only' ? 'offline' : 'hybrid'
-          this.updateRuntimeBadge(context)
-        }
-      }
-
-      // Tier 2: Minimized-Evidence Cloud LLM Fallback (only matched evidence lines)
-      if (!answerText && getAssistantMode() !== 'local-only') {
+      // Tier 1: Minimized-Evidence Cloud LLM (only matched facts + bounded 2-turn history)
+      if (getAssistantMode() !== 'local-only') {
         try {
           const cloud = await requestCloudAnswer({
             endpoint: resolveApiEndpoint(this.scriptOrigin),
@@ -464,10 +315,11 @@ export class AssistantWidget {
             detectedIntent: prepared.detectedIntent,
             language: prepared.isTurkish ? 'tr' : 'en',
             evidence: prepared.evidenceLines,
+            history: this.history.slice(-4),
             signal: this.abort.signal,
           })
           answerText = cloud.answer
-          answerMeta = prepared.isTurkish
+          answerMeta = isTurkish
             ? `Minimal Bulut LLM (${cloud.provider}) · ${cloud.evidenceCount} kanıt (~${cloud.payloadBytes} B)`
             : `Minimized Cloud (${cloud.provider}) · ${cloud.evidenceCount} facts (~${cloud.payloadBytes} B)`
         } catch (cloudErr) {
@@ -475,21 +327,26 @@ export class AssistantWidget {
         }
       }
 
-      // Tier 3: Generic Offline Extractive Fallback
+      // Tier 2: Offline Local Extractive Fallback
       if (!answerText) {
         answerText = buildLocalExtractiveAnswer(
           prepared.detectedIntent,
           context,
           prepared.relevantEvidence,
-          prepared.isTurkish,
+          isTurkish,
         )
-        answerMeta = prepared.isTurkish
+        answerMeta = isTurkish
           ? 'Yerel Özet Modu · 0 B gönderildi'
           : 'Offline Local Mode · 0 B sent'
       }
 
       thinking.remove()
       this.appendMessage(answerText, 'assistant', answerMeta)
+      this.history.push(
+        { role: 'user', text: prepared.cleanQuestion.slice(0, 280) },
+        { role: 'assistant', text: answerText.slice(0, 280) },
+      )
+      this.history = this.history.slice(-4)
     } catch (error) {
       thinking.remove()
       if ((error as DOMException).name !== 'AbortError') {
@@ -498,12 +355,12 @@ export class AssistantWidget {
           prepared.detectedIntent,
           context,
           prepared.relevantEvidence,
-          prepared.isTurkish,
+          isTurkish,
         )
         this.appendMessage(
           fallback,
           'assistant',
-          prepared.isTurkish ? 'Yerel Özet Modu · 0 B' : 'Offline Local Mode · 0 B',
+          isTurkish ? 'Yerel Özet Modu · 0 B' : 'Offline Local Mode · 0 B',
         )
       }
     } finally {
@@ -517,13 +374,6 @@ export class AssistantWidget {
   }
 
   private runtimeBadgeText(isTurkish: boolean): { text: string; className: string; headerSub: string } {
-    if (this.currentRuntime === 'nano') {
-      return {
-        text: isTurkish ? 'Cihaz İçi Gemini Nano · 0 B ağ' : 'On-Device Nano · Zero network',
-        className: '',
-        headerSub: isTurkish ? 'Cihaz içi AI hazır' : 'On-device intelligence ready',
-      }
-    }
     if (this.currentRuntime === 'offline') {
       return {
         text: isTurkish ? 'Yerel Özet Modu · 0 B ağ' : 'Offline Local Mode · Zero network',
@@ -534,25 +384,12 @@ export class AssistantWidget {
     return {
       text: isTurkish ? 'Yerel Çıkarım + Minimal Bulut AI' : 'Local Retrieval + Minimized Cloud',
       className: 'pdp-badge-hybrid',
-      headerSub: isTurkish ? 'Sıfır indirme · Hibrit ürün asistanı' : 'Zero-download · Hybrid product AI',
-    }
-  }
-
-  private updateRuntimeBadge(context: ProductContext): void {
-    const isTurkish = this.contextNeedsTurkish(context)
-    const info = this.runtimeBadgeText(isTurkish)
-    const badge = this.root.querySelector<HTMLElement>('.pdp-runtime-badge')
-    if (badge) {
-      badge.textContent = info.text
-      badge.className = `pdp-runtime-badge ${info.className}`.trim()
-    }
-    const headerSub = this.root.querySelector<HTMLElement>('.pdp-header-sub')
-    if (headerSub) {
-      headerSub.innerHTML = `<i class="pdp-dot"></i> ${this.escape(info.headerSub)}`
+      headerSub: isTurkish ? '0 B indirme · Yerel çıkarım asistanı' : 'Zero-download · Local-retrieval AI',
     }
   }
 
   private showReady(context: ProductContext, focusInput = true): void {
+    this.history = []
     const isTurkish = this.contextNeedsTurkish(context)
     const title = context.title || (isTurkish ? 'Ürün' : 'This product')
     const rating = context.rating
@@ -616,7 +453,7 @@ export class AssistantWidget {
     const symbols: Record<string, string> = { empty: '⌕', unsupported: '!', loading: '···', error: '↻' }
     this.q('.pdp-composer').classList.add('pdp-hidden')
     this.q('.pdp-body').innerHTML = `<div class="pdp-state"><div class="pdp-state-icon">${symbols[kind] ?? '!'}</div><strong>${this.escape(title)}</strong><p>${this.escape(message)}</p>${retry ? '<button class="pdp-retry">Try again</button>' : ''}</div>`
-    this.root.querySelector('.pdp-retry')?.addEventListener('click', () => void this.initialize())
+    this.root.querySelector('.pdp-retry')?.addEventListener('click', () => this.initialize())
   }
 
   private appendMessage(text: string, type: 'user' | 'assistant', meta?: string): void {

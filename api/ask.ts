@@ -5,6 +5,8 @@ const MAX_INTENT_CHARS = 40
 const MAX_EVIDENCE_ITEMS = 10
 const MAX_EVIDENCE_ITEM_CHARS = 450
 const MAX_TOTAL_EVIDENCE_CHARS = 2_200
+const MAX_HISTORY_TURNS = 4
+const MAX_HISTORY_ITEM_CHARS = 300
 const RATE_LIMIT_WINDOW_MS = 60_000
 const RATE_LIMIT_MAX_REQUESTS = 15
 const RATE_LIMIT_MAX_BUCKETS = 1_000
@@ -71,12 +73,18 @@ function checkRateLimit(
   return { allowed: true }
 }
 
+interface HistoryTurn {
+  role: 'user' | 'assistant'
+  text: string
+}
+
 interface AskPayload {
   question: string
   productTitle: string
   detectedIntent: string
   language: 'tr' | 'en'
   evidence: string[]
+  history?: HistoryTurn[]
 }
 
 function validatePayload(
@@ -145,9 +153,32 @@ function validatePayload(
     return { ok: false, status: 400, error: 'html_not_allowed' }
   }
 
+  let history: HistoryTurn[] | undefined
+  if (body.history !== undefined) {
+    if (!Array.isArray(body.history) || body.history.length > MAX_HISTORY_TURNS) {
+      return { ok: false, status: 400, error: 'invalid_history' }
+    }
+    history = []
+    for (const rawTurn of body.history) {
+      if (!rawTurn || typeof rawTurn !== 'object' || Array.isArray(rawTurn)) {
+        return { ok: false, status: 400, error: 'invalid_history' }
+      }
+      const turn = rawTurn as Record<string, unknown>
+      const role = turn.role === 'user' ? 'user' : turn.role === 'assistant' ? 'assistant' : null
+      const text = typeof turn.text === 'string' ? turn.text.trim() : ''
+      if (!role || !text || text.length > MAX_HISTORY_ITEM_CHARS) {
+        return { ok: false, status: 400, error: 'invalid_history' }
+      }
+      if (HTML_PAYLOAD_PATTERN.test(text)) {
+        return { ok: false, status: 400, error: 'html_not_allowed' }
+      }
+      history.push({ role, text })
+    }
+  }
+
   return {
     ok: true,
-    data: { question, productTitle, detectedIntent, language, evidence },
+    data: { question, productTitle, detectedIntent, language, evidence, history },
   }
 }
 
@@ -172,6 +203,7 @@ function buildGroundedPrompts(payload: AskPayload): {
     'Keep answers concise (1-3 short sentences), direct, and helpful.',
     'You may make cautious practical inferences strictly grounded in the evidence (e.g. breathable linen/cotton for summer, true-to-size vs tight fit from reviews), clearly noting when customer opinions differ.',
     'When the shopper asks about an unlisted variant, color, or material while another option is explicitly listed in the evidence, state the listed option and clearly note that the requested one is not mentioned.',
+    'Use recent conversation only to resolve follow-up references; every factual claim must still come strictly from the provided page evidence.',
     `If the provided evidence does not answer the question, reply exactly: "${notFoundText}"`,
     'Never invent specs, prices, sizes, or guarantees.',
     'Never add headings or labels like "Evidence:", "Source:", "Kanıt:", or "Kaynak:", and do not use Markdown bold (**).',
@@ -179,11 +211,19 @@ function buildGroundedPrompts(payload: AskPayload): {
   ].join(' ')
 
   const numberedEvidence = payload.evidence.map((line, i) => `${i + 1}. ${line}`).join('\n')
+  const historyLines = payload.history?.length
+    ? [
+        '',
+        'Recent conversation:',
+        ...payload.history.map((turn) => `${turn.role === 'user' ? 'Shopper' : 'Assistant'}: ${turn.text}`),
+      ]
+    : []
   const userPrompt = [
     `Product: ${payload.productTitle}`,
     `Detected intent: ${payload.detectedIntent}`,
     'Page evidence:',
     numberedEvidence,
+    ...historyLines,
     '',
     `Shopper question: ${payload.question}`,
   ].join('\n')

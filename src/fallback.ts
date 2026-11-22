@@ -1,5 +1,5 @@
-import type { QuestionIntent } from './nano'
-import type { AssistantMode, EvidenceItem, ProductContext } from './types'
+import type { QuestionIntent } from './retrieval'
+import type { AssistantMode, ChatTurn, EvidenceItem, ProductContext } from './types'
 
 export interface CloudAnswerRequest {
   endpoint: string
@@ -8,6 +8,7 @@ export interface CloudAnswerRequest {
   detectedIntent: QuestionIntent
   language: 'tr' | 'en'
   evidence: string[]
+  history?: ChatTurn[]
   signal?: AbortSignal
 }
 
@@ -65,6 +66,7 @@ export async function requestCloudAnswer(
         detectedIntent: req.detectedIntent,
         language: req.language,
         evidence: req.evidence,
+        ...(req.history?.length ? { history: req.history.slice(-4) } : {}),
       }),
       signal: controller.signal,
     })

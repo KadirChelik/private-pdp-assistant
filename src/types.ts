@@ -1,9 +1,3 @@
-export type Availability =
-  | 'available'
-  | 'downloadable'
-  | 'downloading'
-  | 'unavailable'
-
 export interface ProductReview {
   rating?: number
   body: string
@@ -179,55 +173,14 @@ export interface RetrievedEvidence {
   items: EvidenceItem[]
 }
 
-export interface LanguageModelSession {
-  inputQuota?: number
-  inputUsage?: number
-  measureInputUsage?(input: string, options?: { signal?: AbortSignal }): Promise<number>
-  clone?(options?: { signal?: AbortSignal }): Promise<LanguageModelSession>
-  prompt(input: string, options?: { signal?: AbortSignal }): Promise<string>
-  promptStreaming?(
-    input: string,
-    options?: { signal?: AbortSignal },
-  ): ReadableStream<string>
-  destroy(): void
-}
-
-export interface LanguageModelFactory {
-  availability(options?: LanguageModelOptions): Promise<Availability>
-  create(options?: LanguageModelOptions): Promise<LanguageModelSession>
-}
-
-export interface LanguageModelOptions {
-  expectedInputs?: Array<{ type: 'text'; languages: string[] }>
-  expectedOutputs?: Array<{ type: 'text'; languages: string[] }>
-  initialPrompts?: Array<{
-    role: 'system' | 'user' | 'assistant'
-    content: string
-  }>
-  monitor?: (monitor: EventTarget) => void
-  signal?: AbortSignal
-}
-
-export interface TranslatorSession {
-  translate(input: string): Promise<string>
-  destroy?(): void
-}
-
-export interface TranslatorFactory {
-  availability(options: TranslatorOptions): Promise<Availability>
-  create(options: TranslatorOptions): Promise<TranslatorSession>
-}
-
-export interface TranslatorOptions {
-  sourceLanguage: string
-  targetLanguage: string
-  monitor?: (monitor: EventTarget) => void
-  signal?: AbortSignal
+export interface ChatTurn {
+  role: 'user' | 'assistant'
+  text: string
 }
 
 export type AssistantMode = 'hybrid' | 'local-only'
 
-export type AnswerEngine = 'nano' | 'cloud' | 'local-extractive' | 'local-gate'
+export type AnswerEngine = 'cloud' | 'local-extractive' | 'local-gate'
 
 export interface PDPAssistantConfig {
   apiEndpoint?: string
@@ -236,8 +189,6 @@ export interface PDPAssistantConfig {
 
 declare global {
   interface Window {
-    LanguageModel?: LanguageModelFactory
-    Translator?: TranslatorFactory
     PDPAssistantConfig?: PDPAssistantConfig
     PDPAssistant?: {
       mount: () => void

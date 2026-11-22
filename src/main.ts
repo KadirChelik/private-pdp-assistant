@@ -1,6 +1,6 @@
 import { AssistantWidget } from './ui'
 import { extractProductContext, getSuggestedQuestions } from './extractor'
-import { buildEvidenceIndex, detectQuestionIntent, retrieveEvidence } from './nano'
+import { buildEvidenceIndex, detectQuestionIntent, retrieveEvidence } from './retrieval'
 
 const ROOT_ID = 'private-pdp-assistant-root'
 let widget: AssistantWidget | undefined
