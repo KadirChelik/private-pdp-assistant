@@ -1,4 +1,4 @@
-import type { ChatTurn, EvidenceItem, ProductContext } from './types'
+import type { EvidenceItem, ProductContext } from './types'
 
 const NOT_FOUND_ANSWER = 'I could not find this information on the product page.'
 const MAX_EVIDENCE_ITEMS = 12
@@ -19,6 +19,7 @@ export type QuestionIntent =
   | 'suitability'
   | 'material'
   | 'fit'
+  | 'size'
   | 'care'
   | 'unknown'
 
@@ -479,6 +480,24 @@ function isFitContext(value: string): boolean {
   ])
 }
 
+function isSizeAvailabilityContext(value: string): boolean {
+  return hasAny(value, [
+    /\bhangi\s+beden/,
+    /\bbedenler/,
+    /\bnumaralar/,
+    /\bbeden\s+secenek/,
+    /\bbeden\s+stok/,
+    /\bstokta\s+hangi/,
+    /\bavailable\s+sizes/,
+    /\bwhat\s+sizes/,
+    /\bsizes?\s+in\s+stock/,
+    /\b(?:xxs|xs|s|m|l|xl|xxl|2xl|3xl|\d{2}(?:[.,]5)?)\s*(?:beden|numara|size)\b/,
+    /\bsize\s*(?:xxs|xs|s|m|l|xl|xxl|\d{2})\b/,
+    /\b(?:xxs|xs|s|m|l|xl|xxl|2xl|3xl)\s+(?:stokta\s+)?var\s+mi\b/,
+    /\bmanken\w*\s*(?:boy|olcu|beden|uzerindeki|giydigi)/,
+  ])
+}
+
 function isCareContext(value: string): boolean {
   return hasAny(value, [
     /\byika/,
@@ -566,6 +585,7 @@ export function detectQuestionIntent(question: string): QuestionIntent {
   if (isReturnContext(value)) return 'returnPolicy'
   if (isDeliveryContext(value)) return 'delivery'
   if (isCareContext(value)) return 'care'
+  if (isSizeAvailabilityContext(value)) return 'size'
   if (isSuitabilityContext(value)) return 'suitability'
   if (isFitContext(value)) return 'fit'
   if (isReviewContext(value)) return 'reviews'
@@ -733,6 +753,25 @@ export function buildEvidenceIndex(context: ProductContext): EvidenceItem[] {
   }
 
   addEvidence(items, 'availability', 'Availability', context.availability, 'product page')
+  if (context.sizes?.length) {
+    addEvidence(items, 'spec', 'Available sizes', context.sizes.join(', '), 'product sizes')
+  }
+  if (context.inStockSizes?.length) {
+    addEvidence(items, 'availability', 'In-stock sizes', context.inStockSizes.join(', '), 'product size availability')
+  }
+  if (context.outOfStockSizes?.length) {
+    addEvidence(items, 'availability', 'Out-of-stock sizes', context.outOfStockSizes.join(', '), 'product size availability')
+  }
+  addEvidence(items, 'spec', 'Selected size', context.selectedSize, 'product sizes')
+  if (context.colors?.length) {
+    addEvidence(items, 'spec', 'Color options', context.colors.join(', '), 'product color options')
+  }
+  if (context.variants?.length) {
+    addEvidence(items, 'spec', 'Variant options', context.variants.join(', '), 'product variants')
+  }
+  for (const modelLine of context.modelMeasurements || []) {
+    addEvidence(items, 'spec', 'Model measurements', modelLine, 'product fit info')
+  }
   addEvidence(items, 'category', 'Category', context.category, 'product page')
 
   for (const breadcrumb of context.breadcrumbs || []) {
@@ -1088,7 +1127,7 @@ function expandedQuestionTerms(
   }
 
   if (intent === 'color') {
-    ;['renk', 'rengi', 'color', 'colour'].forEach((term) => terms.add(term))
+    ;['renk', 'rengi', 'color', 'colour', 'options'].forEach((term) => terms.add(term))
   }
 
   if (intent === 'assembly') {
@@ -1240,10 +1279,35 @@ function expandedQuestionTerms(
   }
 
   if (
-    (/kalip|kalib|kesim|fit|beden|numara|tarakli|dar mi|bol mu/.test(value) &&
+    (/kalip|kalib|kesim|fit|beden|numara|size|manken|tarakli|dar mi|bol mu/.test(value) &&
       !/\bfit\s+(?:a|an|my|in|into|up\s+to)\b/.test(value))
   ) {
-    ;['kalip', 'kalib', 'kesim', 'beden', 'numara', 'tarakli', 'fit'].forEach((term) => terms.add(term))
+    ;[
+      'kalip',
+      'kalib',
+      'kesim',
+      'beden',
+      'numara',
+      'tarakli',
+      'fit',
+      'sizes',
+      'size',
+      'stock',
+      'in-stock',
+      'out-of-stock',
+      'model',
+      'measurements',
+      'manken',
+      'stok',
+    ].forEach((term) => terms.add(term))
+  }
+
+  if (/\bwatt|guc|power\b/.test(value)) {
+    ;['watt', 'guc', 'power'].forEach((term) => terms.add(term))
+  }
+
+  if (/\bfincan|bardak|cup\b/.test(value)) {
+    ;['fincan', 'bardak', 'kapasite', 'capacity', 'cup'].forEach((term) => terms.add(term))
   }
 
   if (/taban|sole|yastiklama|cushion|drop/.test(value)) {
@@ -1300,6 +1364,8 @@ function preferredTypesForIntent(intent: QuestionIntent): EvidenceItem['type'][]
       return ['spec', 'descriptionSpec', 'descriptionSentence', 'title']
     case 'fit':
       return ['spec', 'descriptionSpec', 'descriptionSentence', 'review', 'feature', 'qna']
+    case 'size':
+      return ['availability', 'spec', 'descriptionSpec', 'descriptionSentence', 'review']
     case 'care':
       return ['spec', 'descriptionSpec', 'descriptionSentence', 'material', 'review', 'feature', 'qna']
     case 'reviews':
@@ -1311,6 +1377,7 @@ function preferredTypesForIntent(intent: QuestionIntent): EvidenceItem['type'][]
         'price',
         'basketPrice',
         'promotion',
+        'availability',
         'spec',
         'descriptionSpec',
         'dimension',
@@ -1404,6 +1471,7 @@ const SPECIFIC_ATTRIBUTE_INTENTS: ReadonlySet<QuestionIntent> = new Set([
   'returnPolicy',
   'openedBedDimensions',
   'fit',
+  'size',
   'care',
 ])
 
@@ -1463,7 +1531,7 @@ function scoreEvidence(
     if (/olcu|boyut|ebat|size/.test(combined)) score += 14
   }
 
-  if (intent === 'dimensions') {
+  if (intent === 'dimensions' || isDimensionContext(questionText)) {
     if (
       /\bboy\b|\bboyu\b|yukseklik|yukseklig|genislik|genislig|derinlik|derinlig|uzunluk|uzunlug|olcu|boyut|ebat|ebad|\bcm\b|\bmm\b|height|width|depth|size/.test(
         combined,
@@ -1473,13 +1541,17 @@ function scoreEvidence(
     }
   }
 
+  if (intent === 'size') {
+    if (/beden|numara|stok|size|stock|variant|secenek|options/.test(combined)) score += 35
+  }
+
   if (intent === 'capacity' && /kapasite|kisilik|oturma|capacity/.test(combined)) score += 35
-  if (intent === 'color' && /renk|reng|color|colour/.test(combined)) score += 35
+  if (intent === 'color' && /renk|reng|color|colour|options/.test(combined)) score += 35
   if (intent === 'storage' && /baza|bazali|depolama|hafiza|cekmece|storage|drawer|ssd/.test(combined)) score += 38
 
   if (intent === 'material' || isMaterialContext(questionText)) {
     if (
-      /malzeme|materyal|kumas|metal|ahsap|mdf|sunta|profil|yay|sunger|kasa|taban|iskelet|material|fabric|wood|nylon|ripstop|leather|cotton|polyester|steel|aluminum|plastic|keten|pamuk|linen|file|mesh|eva|kaucuk|rubber|deri|yun|wool|ipek|silk|viskon|denim|celik|silikon/.test(
+      /malzeme|materyal|kumas|icerik|metal|ahsap|mdf|sunta|profil|yay|sunger|kasa|taban|iskelet|material|fabric|wood|nylon|ripstop|leather|cotton|polyester|steel|aluminum|plastic|keten|pamuk|linen|file|mesh|eva|kaucuk|rubber|deri|yun|wool|ipek|silk|viskon|denim|celik|silikon/.test(
         combined,
       )
     ) {
@@ -1488,7 +1560,7 @@ function scoreEvidence(
   }
 
   if (intent === 'fit') {
-    if (/kalip|kalib|kesim|beden|numara|tarakli|fit/.test(combined)) score += 30
+    if (/kalip|kalib|kesim|beden|numara|tarakli|manken|model|fit/.test(combined)) score += 30
   }
 
   if (intent === 'care') {
@@ -1665,7 +1737,7 @@ function fallbackEvidenceForIntent(
   return selected
 }
 
-const MAX_PROMPT_EVIDENCE_CHARS = 1_100
+const MAX_PROMPT_EVIDENCE_CHARS = 1_600
 const INTENT_SUMMARY_TYPES = new Set<QuestionIntent>([
   'reviews',
   'summary',
@@ -1673,6 +1745,7 @@ const INTENT_SUMMARY_TYPES = new Set<QuestionIntent>([
   'assembly',
   'parts',
   'fit',
+  'size',
   'care',
 ])
 
@@ -1753,69 +1826,25 @@ export interface PreparedEvidence {
   notFoundText: string
 }
 
-const ANAPHORIC_FOLLOWUP_TERMS = new Set([
-  'peki',
-  'neden',
-  'niye',
-  'nasil',
-  'ya',
-  'bunun',
-  'onun',
-  'detay',
-  'detayi',
-  'detaylar',
-  'detaylari',
-  'acikla',
-  'aciklar',
-  'baska',
-  'daha',
-  'biraz',
-  'sebep',
-  'sebebi',
-  'ayrinti',
-  'ayrintili',
-  'boyle',
-  'soyle',
-  'bunlar',
-  'onlar',
-  'bunlari',
-  'onlari',
-  'ayrica',
-  'why',
-  'what',
-  'about',
-  'how',
-  'more',
-  'explain',
-  'detail',
-  'details',
-  'else',
-  'reason',
-  'that',
-  'this',
-])
-
-function isConversationalFollowUp(question: string, detectedIntent: QuestionIntent): boolean {
-  if (SPECIFIC_ATTRIBUTE_INTENTS.has(detectedIntent) || detectedIntent === 'material') {
-    return false
-  }
-  const norm = normalize(question)
-  if (!/\b(?:peki|neden|niye|nasil|ya|bunun|onun|detay\w*|acikla\w*|baska|daha|why|what about|how about|more|explain|detail\w*|else)\b/.test(norm)) {
-    return false
-  }
-  const qTokens = tokens(question)
-  if (qTokens.length > 6) return false
-  return qTokens.every((token) => ANAPHORIC_FOLLOWUP_TERMS.has(token))
-}
-
-function runDirectPreparation(
+export function prepareQuestionEvidence(
   productContext: ProductContext,
-  cleanQuestion: string,
+  question: string,
   maxEvidenceItems?: number,
-): {
-  detectedIntent: QuestionIntent
-  relevantEvidence: EvidenceItem[]
-} {
+): PreparedEvidence {
+  const cleanQuestion = clean(question)
+  const isTurkish = isTurkishText(cleanQuestion)
+  const notFoundText = sameLanguageNotFound(cleanQuestion)
+  if (!cleanQuestion) {
+    return {
+      cleanQuestion: '',
+      detectedIntent: 'unknown',
+      relevantEvidence: [],
+      evidenceLines: [],
+      isTurkish,
+      notFoundText,
+    }
+  }
+
   const detectedIntent = detectQuestionIntent(cleanQuestion)
   const evidenceIndex = buildEvidenceIndex(productContext)
   const retrievedEvidence = retrieveEvidence(cleanQuestion, evidenceIndex, productContext.title)
@@ -1830,58 +1859,15 @@ function runDirectPreparation(
       isDimensionContext(normQuestion),
       isMaterialContext(normQuestion),
       isFitContext(normQuestion),
+      isSizeAvailabilityContext(normQuestion),
       isCareContext(normQuestion),
       isDeliveryContext(normQuestion),
     ].filter(Boolean).length >= 2
   const itemLimit =
-    maxEvidenceItems ?? (INTENT_SUMMARY_TYPES.has(detectedIntent) || isCompoundQuery ? 8 : 5)
+    maxEvidenceItems ?? (INTENT_SUMMARY_TYPES.has(detectedIntent) || isCompoundQuery ? 10 : 5)
   const relevantEvidence = capEvidenceChars(
     refineEvidence(cleanQuestion, rawCandidates).slice(0, itemLimit),
   )
-  return { detectedIntent, relevantEvidence }
-}
-
-export function prepareQuestionEvidence(
-  productContext: ProductContext,
-  question: string,
-  maxEvidenceItems?: number,
-  history?: ChatTurn[],
-): PreparedEvidence {
-  const cleanQuestion = clean(question)
-  let isTurkish = isTurkishText(cleanQuestion)
-  let notFoundText = sameLanguageNotFound(cleanQuestion)
-  if (!cleanQuestion) {
-    return {
-      cleanQuestion: '',
-      detectedIntent: 'unknown',
-      relevantEvidence: [],
-      evidenceLines: [],
-      isTurkish,
-      notFoundText,
-    }
-  }
-
-  let { detectedIntent, relevantEvidence } = runDirectPreparation(
-    productContext,
-    cleanQuestion,
-    maxEvidenceItems,
-  )
-
-  if (!relevantEvidence.length && history?.length) {
-    const lastUserTurn = [...history].reverse().find((turn) => turn.role === 'user')?.text
-    if (lastUserTurn && isConversationalFollowUp(cleanQuestion, detectedIntent)) {
-      const combined = `${clean(lastUserTurn)} ${cleanQuestion}`
-      const followUp = runDirectPreparation(productContext, combined, maxEvidenceItems)
-      if (followUp.relevantEvidence.length) {
-        detectedIntent = followUp.detectedIntent
-        relevantEvidence = followUp.relevantEvidence
-        isTurkish = isTurkish || isTurkishText(lastUserTurn)
-        notFoundText = isTurkish
-          ? 'Bu bilgiyi ürün sayfasında net olarak bulamadım.'
-          : NOT_FOUND_ANSWER
-      }
-    }
-  }
 
   const evidenceLines = relevantEvidence.map((item) => {
     const label = item.label ? `${item.label}: ` : ''
@@ -1896,13 +1882,4 @@ export function prepareQuestionEvidence(
     isTurkish,
     notFoundText,
   }
-}
-
-export function prepareConversationalEvidence(
-  productContext: ProductContext,
-  question: string,
-  history?: ChatTurn[],
-  maxEvidenceItems?: number,
-): PreparedEvidence {
-  return prepareQuestionEvidence(productContext, question, maxEvidenceItems, history)
 }

@@ -155,6 +155,31 @@ export function buildLocalExtractiveAnswer(
     }
   }
 
+  if (intent === 'size' && context.sizes?.length) {
+    const parts: string[] = []
+    if (context.inStockSizes?.length) {
+      parts.push(
+        isTurkish
+          ? `Stokta olan beden/numaralar: ${context.inStockSizes.join(', ')}.`
+          : `Sizes in stock: ${context.inStockSizes.join(', ')}.`,
+      )
+    } else {
+      parts.push(
+        isTurkish
+          ? `Sayfadaki beden/numara seçenekleri: ${context.sizes.join(', ')}.`
+          : `Listed sizes: ${context.sizes.join(', ')}.`,
+      )
+    }
+    if (context.outOfStockSizes?.length) {
+      parts.push(
+        isTurkish
+          ? `Tükenenler / stok dışı: ${context.outOfStockSizes.join(', ')}.`
+          : `Out of stock: ${context.outOfStockSizes.join(', ')}.`,
+      )
+    }
+    return parts.join(' ')
+  }
+
   if (intent === 'summary') {
     const parts: string[] = []
     if (context.title) parts.push(context.title)

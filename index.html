@@ -45,6 +45,12 @@
       .description{color:var(--muted);margin:0 0 18px}
       .specs{margin:22px 0;padding:0;list-style:none;border-top:1px solid #ccd5ce}
       .specs li{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid #ccd5ce;font-size:15px}
+      .size-section{margin:16px 0 18px}
+      .size-label{font-size:13px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em}
+      .size-list{display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;list-style:none}
+      .size-btn{min-width:44px;padding:8px 13px;border-radius:10px;border:1px solid #ccd5ce;background:#fff;color:var(--ink);font-weight:700;font-size:14px;cursor:pointer}
+      .size-btn[disabled]{background:#f1f4f2;color:#92a097;text-decoration:line-through;cursor:not-allowed;opacity:.72}
+      .model-info{margin:0 0 16px;padding:10px 13px;border-radius:12px;background:#f4f7f5;border:1px solid #d9e2dc;font-size:13.5px;font-weight:600;color:var(--ink)}
       .buy{width:100%;border:0;border-radius:14px;padding:15px;background:var(--brand);color:#fff;font-weight:700;font-size:16px;cursor:pointer}
       .buy:hover{background:#123222}
 
@@ -311,10 +317,11 @@
                 { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'Islak asfaltta kauçuk taban tutuşu gayet güven veriyor, kargo ertesi gün ulaştı.' },
               ],
             },
+            sizes: ['40', '41', '42', '43', { label: '44', inStock: false }],
             chips: [
+              'Hangi numaralar stokta var?',
               'Geniş taraklı ayağa olur mu, kalıbı nasıl?',
               'Sepette fiyatı ne kadar?',
-              'Tabanı ve ağırlığı nasıl?',
               'Kırmızı rengi var mı?',
             ],
           },
@@ -361,10 +368,12 @@
                 { '@type': 'Review', reviewRating: { '@type': 'Rating', ratingValue: '5' }, reviewBody: 'Bej rengi çok şık duruyor, 30 derecede hassas yıkamada çekme yapmadı.' },
               ],
             },
+            sizes: ['XS', 'S', 'M', 'L', { label: 'XL', inStock: false }],
+            modelInfo: 'Manken boyu: 176 cm · Üzerindeki beden: S',
             chips: [
+              'Hangi bedenler stokta var, XL var mı?',
+              'Mankenin üzerindeki beden ne?',
               'Yaz düğününde terletir mi, iç gösterir mi?',
-              'Nasıl yıkanır, çekme yapar mı?',
-              'Kalıbı nasıl?',
               'Siyah rengi var mı?',
             ],
           },
@@ -396,6 +405,23 @@
           const specsHtml = p.specs.map(function (pair) {
             return '<li><span>' + esc(pair[0]) + '</span><strong>' + esc(pair[1]) + '</strong></li>'
           }).join('')
+          const sizesHtml = Array.isArray(p.sizes) && p.sizes.length
+            ? '<div class="size-section" aria-label="' + esc(p.theme === 'shoe' ? 'Numara Seçenekleri' : 'Beden Seçenekleri') + '">' +
+                '<div class="size-label">' + esc(p.theme === 'shoe' ? 'Numara Seçenekleri' : 'Beden Seçenekleri') + '</div>' +
+                '<ul class="size-list">' +
+                p.sizes.map(function (item) {
+                  const label = typeof item === 'string' ? item : item.label
+                  const inStock = typeof item === 'string' ? true : item.inStock !== false
+                  return '<li><button type="button" class="size-btn"' +
+                    (inStock ? '' : ' disabled title="Stokta yok"') +
+                    '>' + esc(label) + '</button></li>'
+                }).join('') +
+                '</ul>' +
+              '</div>'
+            : ''
+          const modelInfoHtml = p.modelInfo
+            ? '<p class="model-info">' + esc(p.modelInfo) + '</p>'
+            : ''
           const reviewsHtml = p.reviews.map(function (r) {
             return '<article class="review-card" itemprop="review">' +
               '<div class="review-meta"><span>★ ' + esc(r.rating) + ' / 5</span><span>' + esc(r.author) + '</span></div>' +
@@ -422,6 +448,8 @@
               '</div>' +
               '<div class="stock" itemprop="availability">' + esc(p.stockText) + '</div>' +
               '<p class="description" itemprop="description">' + esc(p.description) + '</p>' +
+              sizesHtml +
+              modelInfoHtml +
               '<ul class="specs">' + specsHtml + '</ul>' +
               '<button class="buy" type="button">' + esc(p.buyLabel) + '</button>' +
             '</section>'

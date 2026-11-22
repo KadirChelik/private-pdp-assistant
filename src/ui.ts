@@ -26,11 +26,19 @@ function buildKeyFacts(context: ProductContext): string[] {
   }
 
   for (const [key, rawValue] of Object.entries(context.specs)) {
-    if (facts.length >= 4) break
+    if (facts.length >= 3) break
     const value = rawValue.trim()
     if (!value || value.length > 36) continue
     const compactKey = key.trim()
     pushFact(compactKey && compactKey.length <= 24 ? `${compactKey}: ${value}` : value)
+  }
+
+  const sizeList = context.inStockSizes?.length ? context.inStockSizes : context.sizes
+  if (facts.length < 4 && sizeList?.length) {
+    const preview = sizeList.slice(0, 5).join(', ')
+    const suffix = sizeList.length > 5 ? ` +${sizeList.length - 5}` : ''
+    const isTr = /ç|ğ|ı|ö|ş|ü|TL|₺/i.test(`${context.title ?? ''} ${context.listedPrice ?? ''}`)
+    pushFact(`${isTr ? 'Stok' : 'Sizes'}: ${preview}${suffix}`)
   }
 
   if (facts.length < 4 && context.dimensionDetails?.bedSize) {
@@ -276,7 +284,7 @@ export class AssistantWidget {
       this.showReady(context, false)
     }
 
-    const prepared = prepareQuestionEvidence(context, question, undefined, this.history)
+    const prepared = prepareQuestionEvidence(context, question)
     const isTurkish = prepared.isTurkish || this.contextNeedsTurkish(context)
 
     input.value = ''

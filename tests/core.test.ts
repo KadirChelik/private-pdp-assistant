@@ -1051,22 +1051,169 @@ test('extractProductContext handles split external PDP DOM containers, collapsed
   }
 })
 
-test('conversational follow-up reuses prior fit evidence while rejecting unrelated absent attributes at 0 B', () => {
-  const dressCtx = buildDressDemoContext()
-  const history = [
-    { role: 'user' as const, text: 'Kalıbı nasıl?' },
-    { role: 'assistant' as const, text: 'Elbisenin kalıbı rahat kesimdir, kendi bedeninizi alabilirsiniz.' },
-  ]
+test('extractProductContext extracts sizes with stock status, ignores Tailwind size-0 and quantity selects, and cleans store/table noise', () => {
+  const restore = installDom(`<!doctype html><html lang="tr"><head>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "ProductGroup",
+        "name": "Yeşil Erkek Gömlek",
+        "brand": { "@type": "Brand", "name": "DemoApparel" },
+        "hasVariant": [
+          {
+            "@type": "Product",
+            "size": "S",
+            "offers": { "@type": "Offer", "price": "799", "priceCurrency": "TRY", "availability": "https://schema.org/InStock" }
+          },
+          {
+            "@type": "Product",
+            "size": "XL",
+            "offers": { "@type": "Offer", "price": "799", "priceCurrency": "TRY", "availability": "https://schema.org/OutOfStock" }
+          }
+        ]
+      }
+    </script>
+  </head><body>
+    <main class="product-detail">
+      <h1>Yeşil Erkek Gömlek</h1>
+      <div class="price">799 TL</div>
+      <div class="size-0 icon-placeholder"></div>
+      <div class="size-4 icon-dot"></div>
+      <select name="quantity" id="qty"><option value="1">1</option><option value="2">2</option></select>
+      <select name="CityId" id="city"><option value="34">İstanbul</option></select>
+      <select class="size-select-list-radio d-none" name="size">
+        <option value="S">S</option>
+        <option value="M" selected>M</option>
+        <option value="L">L</option>
+        <option value="XL" disabled>XL (STOĞA GELİNCE HABER VER)</option>
+      </select>
+      <ul class="size-list">
+        <li class="size-li"><label class="size-text">S</label></li>
+        <li class="size-li"><label class="size-text selected">M</label></li>
+        <li class="size-li"><label class="size-text">L</label></li>
+        <li class="size-li"><button type="button" disabled>XL</button></li>
+      </ul>
+      <p>Manken Ölçüleri: Boy: 1.88 cm Göğüs: 98 cm Bel: 79 cm Ürünün Bedeni: M</p>
+      <table>
+        <tr><th>Fit </th><td>Normal Kesim</td></tr>
+        <tr><th>Kumaş</th><td>%100 Pamuk</td></tr>
+        <tr><th>Mağaza Adı</th><td>İl · Stok Adedi</td></tr>
+        <tr><th>38</th><td>40 · 42 · 44 · 46</td></tr>
+      </table>
+    </main>
+  </body></html>`, 'https://apparel.test/p/yesil-erkek-gomlek')
 
-  const followUp = prepareQuestionEvidence(dressCtx, 'Peki neden?', undefined, history)
-  assert.ok(followUp.relevantEvidence.some((e) => /rahat kesim/i.test(e.value)))
-  assert.equal(followUp.isTurkish, true)
+  try {
+    const ctx = extractProductContext()
+    assert.equal(ctx.specs['Fit'], 'Normal Kesim')
+    assert.equal(ctx.specs['Kumaş'], '%100 Pamuk')
+    assert.equal(ctx.specs['Fit '], undefined)
+    assert.equal(ctx.specs['Mağaza Adı'], undefined)
+    assert.equal(ctx.specs['38'], undefined)
 
-  const unrelatedAbsent = prepareQuestionEvidence(dressCtx, 'Bluetooth var mı?', undefined, history)
-  assert.deepEqual(unrelatedAbsent.relevantEvidence, [])
+    assert.ok(ctx.sizes?.includes('S'))
+    assert.ok(ctx.sizes?.includes('M'))
+    assert.ok(ctx.sizes?.includes('L'))
+    assert.ok(ctx.sizes?.includes('XL'))
+    assert.ok(!ctx.sizes?.some((s) => /^(1|2|34|size-0|size-4|İstanbul)$/i.test(s)))
+    assert.ok(ctx.inStockSizes?.includes('S'))
+    assert.ok(ctx.inStockSizes?.includes('M'))
+    assert.ok(ctx.inStockSizes?.includes('L'))
+    assert.equal(ctx.selectedSize, 'M')
+    assert.ok(ctx.outOfStockSizes?.includes('XL'))
+    assert.match((ctx.modelMeasurements || []).join(' '), /1\.88|Ürünün Bedeni:\s*M/i)
 
-  const newTopicAbsent = prepareQuestionEvidence(dressCtx, 'Peki Bluetooth?', undefined, history)
-  assert.deepEqual(newTopicAbsent.relevantEvidence, [])
+    const qs = getSuggestedQuestions(ctx)
+    assert.ok(qs.some((q) => /Hangi bedenler stokta var/i.test(q)))
+
+    const stockQ = prepareQuestionEvidence(ctx, 'Hangi bedenler stokta var?')
+    assert.equal(stockQ.detectedIntent, 'size')
+    assert.ok(stockQ.relevantEvidence.some((e) => /S.*M.*L|M/i.test(e.value)))
+    const stockLocal = buildLocalExtractiveAnswer(stockQ.detectedIntent, ctx, stockQ.relevantEvidence, true)
+    assert.match(stockLocal, /Stokta olan beden\/numaralar:/i)
+    assert.match(stockLocal, /Tükenenler \/ stok dışı:\s*XL/i)
+
+    const hasM = prepareQuestionEvidence(ctx, 'M beden var mı?')
+    assert.equal(hasM.detectedIntent, 'size')
+    assert.ok(hasM.relevantEvidence.some((e) => /\bM\b/.test(e.value)))
+
+    const hasXL = prepareQuestionEvidence(ctx, 'XL stokta var mı?')
+    assert.equal(hasXL.detectedIntent, 'size')
+    const xlLocal = buildLocalExtractiveAnswer(hasXL.detectedIntent, ctx, hasXL.relevantEvidence, true)
+    assert.match(xlLocal, /XL/)
+    assert.match(xlLocal, /stok dışı|Stokta olmayan/i)
+
+    const modelQ = prepareQuestionEvidence(ctx, 'Mankenin giydiği beden ne?')
+    assert.ok(modelQ.relevantEvidence.some((e) => /Ürünün Bedeni:\s*M/i.test(e.value)))
+  } finally {
+    restore()
+  }
+})
+
+test('extractProductContext handles shoe numbers, IKEA color modal, and Karaca possessive specs cleanly', () => {
+  const restoreShoe = installDom(`<!doctype html><html lang="tr"><body>
+    <main class="product-detail">
+      <h1>AeroStride Pro Koşu Ayakkabısı</h1>
+      <div class="price">3.499 TL</div>
+      <ul class="size-list" aria-label="Numara Seçenekleri">
+        <li><button type="button" class="size-btn">40</button></li>
+        <li><button type="button" class="size-btn">41</button></li>
+        <li><button type="button" class="size-btn">42</button></li>
+        <li><button type="button" class="size-btn" disabled>44</button></li>
+      </ul>
+    </main>
+  </body></html>`, 'https://shoes.test/aerostride')
+
+  try {
+    const shoeCtx = extractProductContext()
+    assert.ok(shoeCtx.inStockSizes?.includes('42'))
+    assert.ok(shoeCtx.outOfStockSizes?.includes('44'))
+    assert.ok(getSuggestedQuestions(shoeCtx).some((q) => /Hangi numaralar stokta var/i.test(q)))
+
+    const numQ = prepareQuestionEvidence(shoeCtx, '42 numara var mı?')
+    assert.equal(numQ.detectedIntent, 'size')
+    assert.ok(numQ.relevantEvidence.some((e) => /\b42\b/.test(e.value)))
+  } finally {
+    restoreShoe()
+  }
+
+  const restoreMulti = installDom(`<!doctype html><html lang="tr"><body>
+    <main class="product-detail">
+      <h1>Karaca &amp; IKEA Kombine Özellik Testi</h1>
+      <div class="price">4.499 TL</div>
+      <div class="product-color-modal">
+        <a href="/beyaz"><span>beyaz</span></a>
+        <a href="/ceviz"><span>kahverengi ceviz görünüm</span></a>
+        <a href="/mese"><span>meşe görünümlü</span></a>
+        <a href="/venge"><span>venge</span></a>
+      </div>
+      <ul>
+        <li><span>Gövde Malzemesi</span><strong>Plastik</strong></li>
+        <li><span>Hazne Malzemesi</span><strong>Plastik</strong></li>
+        <li><span>Bardak/ Fincan Kapasitesi</span><strong>5 Fincan</strong></li>
+        <li><span>Güç</span><strong>535 Watt</strong></li>
+      </ul>
+    </main>
+  </body></html>`, 'https://home.test/urun')
+
+  try {
+    const multiCtx = extractProductContext()
+    assert.ok(multiCtx.colors?.includes('beyaz'))
+    assert.ok(multiCtx.colors?.includes('venge'))
+    assert.equal(multiCtx.colors?.length, 4)
+
+    assert.ok(getSuggestedQuestions(multiCtx).some((q) => /Hangi renkleri var/i.test(q)))
+
+    const colorQ = prepareQuestionEvidence(multiCtx, 'Hangi renkleri var?')
+    assert.equal(colorQ.detectedIntent, 'color')
+    assert.ok(colorQ.relevantEvidence.some((e) => /kahverengi ceviz|venge/i.test(e.value)))
+
+    const specQ = prepareQuestionEvidence(multiCtx, 'Gövde malzemesi ve kapasitesi nedir?')
+    assert.ok(specQ.relevantEvidence.some((e) => /Gövde Malzemesi/i.test(e.label) && /Plastik/i.test(e.value)))
+    assert.ok(specQ.relevantEvidence.some((e) => /Kapasitesi/i.test(e.label) && /5 Fincan/i.test(e.value)))
+  } finally {
+    restoreMulti()
+  }
 })
 
 test('api/ask handleAskRequest validates and forwards bounded conversation history', async () => {

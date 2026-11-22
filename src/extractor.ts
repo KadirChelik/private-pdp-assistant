@@ -332,9 +332,21 @@ function jsonLdSpecs(product: JsonObject): Record<string, string> {
     ['width', 'Width'],
     ['height', 'Height'],
     ['depth', 'Depth'],
+    ['author', 'Author'],
+    ['publisher', 'Publisher'],
+    ['numberOfPages', 'Pages'],
+    ['bookFormat', 'Format'],
+    ['inLanguage', 'Language'],
+    ['warranty', 'Warranty'],
+    ['countryOfOrigin', 'Origin'],
+    ['itemCondition', 'Condition'],
   ]
   for (const [field, label] of topLevelFields) {
-    addSpec(label, jsonLdPropertyValue(product[field]))
+    let val = jsonLdPropertyValue(product[field])
+    if (field === 'itemCondition' && /^https?:\/\/schema\.org\//i.test(val)) {
+      val = val.replace(/^https?:\/\/schema\.org\//i, '').replace(/Condition$/i, '')
+    }
+    addSpec(label, val)
   }
 
   return specs
@@ -347,7 +359,7 @@ const COLLAPSED_SPEC_CONTAINER_SELECTOR =
   '[class*="product-info" i],[class*="dimension" i],[class*="measure" i],[class*="spec" i],[class*="attribute" i],[class*="property" i],[class*="ozellik" i],[class*="tab" i],[class*="accordion" i],[class*="collapse" i],[role="tabpanel"],#productDetails_techSpec_section_1,#productDetails_detailBullets_sections1,#detailBullets_feature_div'
 
 const SPEC_JUNK_LINE =
-  /^(?:mağazalar|giriş yap|üye ol|sepete ekle|favorilerim|daha fazla bilgi|ilgili kategoriler|kvkk|gizlilik|teslimat ve iade|ödeme seçenekleri|taksit(?:\s*seçenekleri)?|taksit\s*tutarı(?:\s*·\s*toplam\s*tutar)?|toplam\s*tutar)$/i
+  /^(?:mağazalar|mağaza\s+adı|il\s*·\s*stok\s*adedi|stok\s*adedi|giriş yap|üye ol|sepete ekle|favorilerim|daha fazla bilgi|ilgili kategoriler|kvkk|gizlilik|teslimat ve iade|ödeme seçenekleri|taksit(?:\s*seçenekleri)?|taksit\s*tutarı(?:\s*·\s*toplam\s*tutar)?|toplam\s*tutar)$/i
 
 function isInsideExcludedContainer(element: Element): boolean {
   return Boolean(element.closest(EXCLUDED_CONTAINER_SELECTOR))
@@ -371,7 +383,7 @@ function specText(element: HTMLElement | null, allowCollapsedPanels: boolean): s
 function domSpecs(root: ParentNode, allowCollapsedPanels = true): Record<string, string> {
   const specs: Record<string, string> = {}
   const add = (labelValue: string, detailValue: string): void => {
-    const key = clean(labelValue).replace(/:\s*$/, '')
+    const key = clean(labelValue).replace(/\s*:\s*$/, '')
     const value = compact(clean(detailValue), 200)
     if (
       !key ||
@@ -380,6 +392,7 @@ function domSpecs(root: ParentNode, allowCollapsedPanels = true): Record<string,
       key.length > 48 ||
       key.split(/\s+/).length > 6 ||
       /[!?]|\.\s*$/.test(key) ||
+      /^\d+(?:[-–/]\d+)?$/.test(key) ||
       key === value ||
       SPEC_JUNK_LINE.test(key) ||
       SPEC_JUNK_LINE.test(value) ||
@@ -568,10 +581,270 @@ export function parseSpecsFromDescription(descriptionText: string): ParsedDescri
   return { descriptionSpecs, dimensionDetails, materialsAndBuild, comfortAndBuildFacts, partsInfo }
 }
 
-function extractFeatures(root: HTMLElement): string[] {
+function extractFeatures(root: HTMLElement, specs?: Record<string, string>): string[] {
   const selectors = ['[data-feature-name="featurebullets"] li', '[data-testid*="feature"] li', '[class*="feature" i] li', '[class*="highlight" i] li']
-  return unique(selectors.flatMap((selector) => Array.from(root.querySelectorAll<HTMLElement>(selector)).map(textOf))
-    .filter((value) => value.length >= 4 && value.length <= 300), MAX_FEATURES)
+  const primary = selectors.flatMap((selector) =>
+    Array.from(root.querySelectorAll<HTMLElement>(selector))
+      .filter((el) => !isInsideExcludedContainer(el))
+      .map(textOf),
+  ).filter((value) => value.length >= 4 && value.length <= 300)
+
+  const specSet = new Set(Object.values(specs || {}).map((v) => v.toLocaleLowerCase()))
+  const secondary = Array.from(
+    root.querySelectorAll<HTMLElement>('[class*="product-detail" i] ul li,[class*="product-info" i] ul li,[class*="description" i] ul li'),
+  )
+    .filter((el) => {
+      if (isInsideExcludedContainer(el)) return false
+      if (el.closest('[class*="size-list" i],[class*="size-select" i],[class*="color-list" i],[class*="attribute" i]')) {
+        return false
+      }
+      return isVisible(el)
+    })
+    .map(textOf)
+    .filter((value) => value.length >= 10 && value.length <= 220 && !specSet.has(value.toLocaleLowerCase()))
+
+  return unique([...primary, ...secondary], MAX_FEATURES)
+}
+
+const LETTER_SIZE_PATTERN =
+  /^(?:4XS|3XS|2XS|XXS|XS|S|M|L|XL|XXL|2XL|3XL|4XL|5XL|6XL|STD|STANDART|TEK BEDEN|ONE SIZE|FREE SIZE|XS\/S|S\/M|M\/L|L\/XL|XL\/XXL)$/i
+const NUMERIC_SIZE_PATTERN =
+  /^(\d{2})(?:[.,]5)?(?:\s*[-/]\s*(\d{2})(?:[.,]5)?)?(?:\s*(?:EU|US|UK|TR|CM|NUMARA|BEDEN))?$/i
+const KIDS_SIZE_PATTERN =
+  /^\d{1,2}\s*[-–]\s*\d{1,2}\s*(?:ay|yaş|yas|months?|years?|y|m)$/i
+
+function isValidSizeLabel(label: string): boolean {
+  const cleaned = clean(label)
+  if (!cleaned || cleaned.length > 20) return false
+  if (LETTER_SIZE_PATTERN.test(cleaned)) return true
+  if (KIDS_SIZE_PATTERN.test(cleaned)) return true
+  const numMatch = cleaned.match(NUMERIC_SIZE_PATTERN)
+  if (!numMatch) return false
+  const first = Number(numMatch[1])
+  return first >= 16 && first <= 64
+}
+
+const OUT_OF_STOCK_CLASS_RE = /out-?of-?stock|sold-?out|disabled|unavailable|no-?stock|tuken|passive|stok.*yok/i
+const OUT_OF_STOCK_TEXT_RE = /\b(?:stoğa\s+gelince|stoga\s+gelince|tükendi|tukendi|stokta\s+yok|out\s+of\s+stock|sold\s+out|notify\s+me|haber\s+ver)\b/i
+const STRIP_SIZE_SUFFIX_RE = /\s*[-–—|]?\s*(?:stoğa\s+gelince\s+haber\s+ver|stoga\s+gelince\s+haber\s+ver|tükendi|tukendi|stokta\s+yok|out\s+of\s+stock|sold\s+out|haber\s+ver|notify\s+me).*$/i
+
+function extractSizeOptions(
+  root: HTMLElement,
+  product: JsonObject | undefined,
+): {
+  sizes: string[]
+  inStockSizes: string[]
+  outOfStockSizes: string[]
+  selectedSize?: string
+} {
+  const entries = new Map<string, { label: string; status: 'in' | 'out' | 'unknown' }>()
+  let selectedSize: string | undefined
+
+  const record = (rawLabel: string, status: 'in' | 'out' | 'unknown', selected = false): void => {
+    const cleaned = clean(rawLabel.replace(STRIP_SIZE_SUFFIX_RE, ''))
+    if (!isValidSizeLabel(cleaned)) return
+    const key = cleaned.toLocaleUpperCase()
+    const existing = entries.get(key)
+    if (!existing) {
+      entries.set(key, { label: cleaned, status })
+    } else if (status === 'out' || (existing.status === 'unknown' && status === 'in')) {
+      existing.status = status
+    }
+    if (selected && !selectedSize) selectedSize = cleaned
+  }
+
+  // 1. JSON-LD size & variant stock
+  if (product) {
+    const rawSizes = Array.isArray(product.size)
+      ? product.size.map((item) => scalar(item) || namedValue(item))
+      : scalar(product.size)
+        ? scalar(product.size).split(/[,|]/)
+        : []
+    for (const s of rawSizes) record(s, 'unknown')
+
+    for (const variant of objects(product.hasVariant)) {
+      const sizeVal = scalar(variant.size) || namedValue(variant.size)
+      if (!sizeVal) continue
+      const offer = firstObject(variant.offers)
+      const avail = normalizeAvailability(offer?.availability).toLowerCase()
+      const status = avail.includes('outofstock') || avail.includes('soldout')
+        ? 'out'
+        : avail.includes('instock')
+          ? 'in'
+          : 'unknown'
+      record(sizeVal, status)
+    }
+  }
+
+  // 2. Semantic DOM size containers (avoiding Tailwind size-0 / size-4 utilities)
+  const SIZE_PICKER_SELECTOR =
+    '[class*="size-list" i],[class*="size-select" i],[class*="size-box" i],[class*="size-picker" i],[class*="size-option" i],[class*="size-selector" i],[class*="sizes" i],[class*="beden" i],[data-testid*="size" i],[data-testid*="beden" i],[aria-label*="beden" i],[aria-label*="size" i],[id*="size-list" i],[id*="beden" i]'
+
+  const scanSizeContainers = (scope: ParentNode): void => {
+    for (const container of scope.querySelectorAll<HTMLElement>(SIZE_PICKER_SELECTOR)) {
+      if (isInsideExcludedContainer(container)) continue
+      if (container.matches('select')) continue
+      const items = container.querySelectorAll<HTMLElement>(
+        'button,[role="radio"],[role="option"],label,a,li,[class*="size-item" i],[class*="size-li" i],[class*="size-btn" i],[class*="beden-item" i]',
+      )
+      for (const item of items) {
+        if (isInsideExcludedContainer(item)) continue
+        if (item.matches('li') && item.querySelector('button,label,a,[role="radio"],[role="option"]')) continue
+        const rawText = clean(item.textContent)
+        if (!rawText || rawText.length > 60) continue
+        const isDisabled =
+          item.matches(':disabled') ||
+          item.hasAttribute('disabled') ||
+          item.getAttribute('aria-disabled') === 'true' ||
+          OUT_OF_STOCK_CLASS_RE.test(String(item.className || '')) ||
+          OUT_OF_STOCK_TEXT_RE.test(rawText) ||
+          Boolean(
+            item.querySelector(
+              'input[disabled],[disabled],[aria-disabled="true"],[class*="out-of-stock" i],[class*="disabled" i],[class*="sold-out" i]',
+            ),
+          )
+        const checkedInput = item.querySelector<HTMLInputElement>('input[type="radio"]:checked')
+        const isSelected =
+          item.getAttribute('aria-checked') === 'true' ||
+          item.getAttribute('aria-pressed') === 'true' ||
+          item.getAttribute('aria-selected') === 'true' ||
+          /\b(?:selected|active)\b/i.test(String(item.className || '')) ||
+          Boolean(checkedInput)
+        record(rawText, isDisabled ? 'out' : 'in', isSelected)
+      }
+    }
+
+    for (const select of scope.querySelectorAll<HTMLSelectElement>('select')) {
+      if (isInsideExcludedContainer(select)) continue
+      const meta = `${select.name} ${select.id} ${select.className} ${select.getAttribute('aria-label') || ''} ${select.options[0]?.text || ''}`
+      if (!/beden|size|numara/i.test(meta)) continue
+      if (/quantity|adet|city|il\b|ulke|country|sort|siralama/i.test(meta)) continue
+      for (const opt of Array.from(select.options)) {
+        const rawText = clean(opt.textContent)
+        if (!rawText) continue
+        const isDisabled = opt.disabled || OUT_OF_STOCK_TEXT_RE.test(rawText)
+        record(rawText, isDisabled ? 'out' : 'in', opt.selected && isValidSizeLabel(rawText.replace(STRIP_SIZE_SUFFIX_RE, '')))
+      }
+    }
+  }
+
+  scanSizeContainers(root)
+  if (!entries.size && root !== document.body) {
+    scanSizeContainers(document.body)
+  }
+
+  const all = Array.from(entries.values())
+  return {
+    sizes: all.map((e) => e.label),
+    inStockSizes: all.filter((e) => e.status === 'in').map((e) => e.label),
+    outOfStockSizes: all.filter((e) => e.status === 'out').map((e) => e.label),
+    selectedSize,
+  }
+}
+
+function cleanColorLabel(raw: string): string {
+  return clean(
+    raw
+      .replace(/\d[\d.,]*\s*(?:TL|TRY|₺|\$|€|£)/gi, ' ')
+      .replace(/\b(?:sepete\s+ekle|add\s+to\s+(?:cart|bag)|renk|color|colour|seçiniz|seciniz)\b/gi, ' '),
+  )
+}
+
+function extractColorOptions(
+  root: HTMLElement,
+  product: JsonObject | undefined,
+  specs: Record<string, string>,
+): string[] {
+  const candidates: string[] = []
+
+  const pushColor = (raw: string): void => {
+    const label = cleanColorLabel(raw)
+    if (label.length >= 2 && label.length <= 40 && !/^\d+$/.test(label)) {
+      candidates.push(label)
+    }
+  }
+
+  for (const [k, v] of Object.entries(specs)) {
+    if (/^(?:renk|color|colour|renk\s+grubu)$/i.test(clean(k))) {
+      for (const part of v.split(/[,/]/)) pushColor(part)
+    }
+  }
+
+  if (product) {
+    const rawColors = Array.isArray(product.color)
+      ? product.color.map((item) => scalar(item) || namedValue(item))
+      : scalar(product.color)
+        ? scalar(product.color).split(/[,/]/)
+        : []
+    for (const c of rawColors) pushColor(c)
+    for (const variant of objects(product.hasVariant)) {
+      const c = scalar(variant.color) || namedValue(variant.color)
+      if (c) pushColor(c)
+    }
+  }
+
+  const scanColorSelectors = (scope: ParentNode): void => {
+    const selectors = [
+      '[class*="product-color-name" i]',
+      '[data-testid*="selected-color" i]',
+      '[class*="color-list" i] a',
+      '[class*="color-list" i] button',
+      '[class*="color-list" i] li',
+      '[class*="color-swatch" i]',
+      '[class*="color-option" i]',
+      '[class*="product-color-modal" i] a',
+      '[class*="product-color-modal" i] li',
+      '[class*="product-color-modal" i] [class*="item" i]',
+      '[data-testid*="color-option" i]',
+      '[data-color]',
+    ]
+    for (const selector of selectors) {
+      for (const el of scope.querySelectorAll<HTMLElement>(selector)) {
+        if (isInsideExcludedContainer(el)) continue
+        const dataColor = el.getAttribute('data-color')
+        if (dataColor) {
+          pushColor(dataColor)
+          continue
+        }
+        const imgAlt = el.querySelector<HTMLImageElement>('img')?.alt
+        const txt = clean(el.textContent) || clean(el.getAttribute('aria-label')) || clean(el.getAttribute('title')) || clean(imgAlt)
+        if (txt) pushColor(txt)
+      }
+    }
+  }
+
+  scanColorSelectors(root)
+  if (root !== document.body) {
+    scanColorSelectors(document.body)
+  }
+
+  return unique(candidates, 16)
+}
+
+function extractModelMeasurements(root: HTMLElement, descriptionText: string): string[] {
+  const MODEL_RE = /\b(?:manken\w*|modelin\s+üzerindeki|model\s+(?:is|wears|wearing|boy|ölçü|olcu)|mannequin)\b/i
+  const results: string[] = []
+
+  for (const line of descriptionText.split(/[\n.]+/)) {
+    const trimmed = clean(line)
+    if (trimmed.length >= 12 && trimmed.length <= 240 && MODEL_RE.test(trimmed)) {
+      results.push(trimmed)
+    }
+  }
+
+  const scanDom = (scope: ParentNode): void => {
+    for (const el of scope.querySelectorAll<HTMLElement>('p,li,div,span')) {
+      if (el.children.length > 2 || isInsideExcludedContainer(el)) continue
+      const trimmed = clean(el.textContent)
+      if (trimmed.length >= 12 && trimmed.length <= 240 && MODEL_RE.test(trimmed)) {
+        results.push(trimmed)
+      }
+    }
+  }
+  scanDom(root)
+  if (!results.length && root !== document.body) scanDom(document.body)
+
+  return unique(results, 4)
 }
 
 function extractBreadcrumbs(): string[] {
@@ -867,20 +1140,32 @@ export function getSuggestedQuestions(context: ProductContext): string[] {
   if (context.basketPrice) add(q('Sepette fiyatı ne kadar?', 'What is the basket price?'))
   else if (context.listedPrice || context.price) add(q('Fiyatı ne kadar?', 'What is the price?'))
 
-  // 2. Fit / Kalıp
+  // 2. Sizes / Stock availability
+  if (context.sizes?.length) {
+    const isFootwear = /ayakkab|bot|sneaker|shoe|running/i.test(
+      normalizeKey(`${context.title ?? ''} ${context.category ?? ''}`),
+    )
+    add(
+      isFootwear
+        ? q('Hangi numaralar stokta var?', 'What shoe sizes are available?')
+        : q('Hangi bedenler stokta var?', 'What sizes are available?'),
+    )
+  }
+
+  // 3. Fit / Kalıp
   if (findSpecKey([/\b(?:kalip|kalib|fit|kesim)\b/])) {
     add(q('Kalıbı nasıl?', 'How is the fit?'))
   }
 
-  // 3. Material / Fabric
+  // 4. Material / Fabric
   const hasMaterialBuild =
     Object.values(context.materialsAndBuild || {}).some(Boolean) ||
     Boolean(context.comfortAndBuildFacts?.length)
   const materialKey = findSpecKey([
-    /\b(?:malzeme|materyal|kumas|material|fabric|ust\s*yuzey|upper)\b/,
+    /\b(?:malzeme\w*|materyal\w*|kumas\w*|urun\s*icerig\w*|icerik|material|fabric|ust\s*yuzey|upper)\b/,
   ])
   if (hasMaterialBuild || materialKey) {
-    const isFabricSpec = Boolean(materialKey && /\bkumas\b/.test(normalizeKey(materialKey)))
+    const isFabricSpec = Boolean(materialKey && /\bkumas/.test(normalizeKey(materialKey)))
     add(isTurkishPage && isFabricSpec ? 'Kumaşı nedir?' : q('Malzemesi nedir?', 'What is it made of?'))
   }
 
@@ -923,7 +1208,7 @@ export function getSuggestedQuestions(context: ProductContext): string[] {
   }
 
   // 9. Capacity (distinguish furniture seating vs bags/bottles/electronics)
-  const capKey = findSpecKey([/\b(?:kapasite|kisilik|oturma|capacity|hacim|volume)\b/])
+  const capKey = findSpecKey([/\b(?:kapasite\w*|kisilik|oturma|capacity|hacim|volume)\b/])
   if (capKey) {
     const capCombined = normalizeKey(`${capKey} ${specs[capKey] ?? ''}`)
     const isSeating = /kisilik|oturma|person|seat/.test(capCombined)
@@ -966,10 +1251,13 @@ export function getSuggestedQuestions(context: ProductContext): string[] {
   if (findSpecKey([/\b(?:agirlik|weight)\b/])) {
     add(q('Ağırlığı ne kadar?', 'How heavy is it?'))
   }
-  if (findSpecKey([/\b(?:renk|colou?r)\b/])) {
+  const colorSpecKey = findSpecKey([/\b(?:renk|colou?r)\b/])
+  if ((context.colors?.length ?? 0) >= 2) {
+    add(q('Hangi renkleri var?', 'What colors are available?'))
+  } else if (colorSpecKey || context.colors?.length) {
     add(q('Rengi nedir?', 'What color is it?'))
   }
-  if (findSpecKey([/\b(?:garanti|warranty)\b/])) {
+  if (findSpecKey([/\b(?:garanti\w*|warranty)\b/])) {
     add(q('Garanti süresi nedir?', 'What is the warranty?'))
   }
 
@@ -991,7 +1279,7 @@ export function getSuggestedQuestions(context: ProductContext): string[] {
   }
 
   // 13. Dynamic spec questions for any remaining attributes on arbitrary websites
-  const NOISY_SPEC_KEY = /\b(?:sku|barkod|barcode|gtin|ean|mpn|isbn|kod|code|id|model\s*no|urun\s*kodu|stok\s*kodu|upc|asin|price|fiyat|liste\s*fiyat|tax|kdv|vergi|taksit|odeme|number\s*of\s*reviews|yorum\s*sayis|availability|stok\s*durum|product\s*type|urun\s*tipi|magazalar|ilgili\s*kategoriler)\b/i
+  const NOISY_SPEC_KEY = /\b(?:sku|barkod|barcode|gtin|ean|mpn|isbn|kod|code|id|model\s*no|urun\s*kodu|stok\s*kodu|upc|asin|price|fiyat|liste\s*fiyat|tax|kdv|vergi|taksit|odeme|magaza\s*ad|olcu\s*tanim|stok\s*aded|number\s*of\s*reviews|yorum\s*sayis|availability|stok\s*durum|product\s*type|urun\s*tipi|magazalar|ilgili\s*kategoriler)\b/i
   for (const [key, rawValue] of Object.entries(specs)) {
     if (questions.length >= Math.min(5, maxBeforeReviews)) break
     if (coveredSpecKeys.has(key)) continue
@@ -1171,7 +1459,11 @@ export function extractProductContext(): ProductContext {
   const qna = extractVisibleQna(root)
   const jsonImages = product ? extractImages(product.image) : []
   const images = jsonImages.length ? jsonImages : [visibleProductImage(root)].filter(Boolean)
-  const known = new Set([title, listedPrice, basketDiscount.price || '', description, ...promotions, ...Object.entries(specs).flat(), ...extractFeatures(root)]
+  const sizeOptions = extractSizeOptions(root, product)
+  const colors = extractColorOptions(root, product, specs)
+  const modelMeasurements = extractModelMeasurements(root, descriptionText)
+  const featureBullets = extractFeatures(root, specs)
+  const known = new Set([title, listedPrice, basketDiscount.price || '', description, ...promotions, ...Object.entries(specs).flat(), ...featureBullets]
     .filter(Boolean).map((value) => value.toLocaleLowerCase()))
   const visibleTextSample = unique(chunks.filter((value) => !known.has(value.toLocaleLowerCase())))
     .join('\n').slice(0, MAX_SAMPLE_CHARS)
@@ -1202,6 +1494,12 @@ export function extractProductContext(): ProductContext {
     availability: normalizeAvailability(offer?.availability)
       || attributeOrText(root, ['[itemprop="availability"]', '[data-testid*="availability"]', '[class*="stock" i]'])
       || undefined,
+    sizes: sizeOptions.sizes.length ? sizeOptions.sizes : undefined,
+    inStockSizes: sizeOptions.inStockSizes.length ? sizeOptions.inStockSizes : undefined,
+    outOfStockSizes: sizeOptions.outOfStockSizes.length ? sizeOptions.outOfStockSizes : undefined,
+    selectedSize: sizeOptions.selectedSize,
+    colors: colors.length ? colors : undefined,
+    modelMeasurements: modelMeasurements.length ? modelMeasurements : undefined,
     url: location.href,
     category: category || undefined,
     breadcrumbs,
@@ -1213,7 +1511,7 @@ export function extractProductContext(): ProductContext {
     comfortAndBuildFacts: parsedDescription.comfortAndBuildFacts,
     assemblyInfo,
     partsInfo: parsedDescription.partsInfo,
-    featureBullets: extractFeatures(root),
+    featureBullets,
     specs,
     image: images[0],
     images,

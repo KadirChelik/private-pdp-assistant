@@ -90,6 +90,13 @@ export interface ProductContext {
   priceCurrency?: string
 
   availability?: string
+  sizes?: string[]
+  inStockSizes?: string[]
+  outOfStockSizes?: string[]
+  selectedSize?: string
+  colors?: string[]
+  variants?: string[]
+  modelMeasurements?: string[]
   url: string
   category?: string
   breadcrumbs?: string[]
