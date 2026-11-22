@@ -1297,3 +1297,60 @@ test('api/ask handleAskRequest validates and forwards bounded conversation histo
   )
   assert.equal(tooManyTurnsRes.status, 400)
 })
+
+test('prepareQuestionEvidence bounds long formatted evidenceLines below /api/ask 450-char limit and retrieves brand for yayinevi', async () => {
+  const restore = installDom(`<!doctype html><html lang="tr"><body>
+    <main class="product-detail">
+      <h1>Algernon'a Çiçekler</h1>
+      <div class="brand">KORİDOR YAYINCILIK</div>
+      <div class="price">295,63 TL</div>
+      <ul>
+        <li><span>Sayfa Sayısı</span><strong>325</strong></li>
+      </ul>
+      <article class="review">
+        <span itemprop="ratingValue">5</span>
+        <p itemprop="reviewBody">${'Sayfalar ilerledikçe akıcılığı koruyan çok etkileyici bir kitap. '.repeat(12)}</p>
+      </article>
+    </main>
+  </body></html>`, 'https://books.test/kitap/algernon')
+
+  try {
+    const ctx = extractProductContext()
+    ctx.brand = 'KORİDOR YAYINCILIK'
+    const prep = prepareQuestionEvidence(ctx, 'Kaç sayfa ve yayınevi nedir?')
+
+    assert.ok(prep.evidenceLines.length > 0)
+    assert.ok(prep.evidenceLines.every((line) => line.length <= 450))
+    assert.ok(prep.evidenceLines.some((line) => /325/.test(line)))
+    assert.ok(prep.evidenceLines.some((line) => /KORİDOR YAYINCILIK/i.test(line)))
+
+    __resetRateLimitsForTests()
+    const res = await handleAskRequest(
+      new Request('https://example.test/api/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: 'Kaç sayfa ve yayınevi nedir?',
+          productTitle: ctx.title,
+          detectedIntent: prep.detectedIntent,
+          language: 'tr',
+          evidence: prep.evidenceLines,
+        }),
+      }),
+      {
+        clientIp: '198.51.100.80',
+        env: { GEMINI_API_KEY: 'test-key' },
+        fetchImpl: async () =>
+          new Response(
+            JSON.stringify({
+              candidates: [{ content: { parts: [{ text: 'Kitap 325 sayfadır ve Koridor Yayıncılık tarafından yayımlanmıştır.' }] } }],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+      },
+    )
+    assert.equal(res.status, 200)
+  } finally {
+    restore()
+  }
+})

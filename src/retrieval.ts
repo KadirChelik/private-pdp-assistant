@@ -1346,6 +1346,10 @@ function expandedQuestionTerms(
     ;['kamera', 'camera', 'mp', 'lens'].forEach((term) => terms.add(term))
   }
 
+  if (/yayinevi|yayinci|publisher|marka|brand/.test(value)) {
+    ;['yayinevi', 'yayinci', 'yayincilik', 'publisher', 'brand', 'marka'].forEach((term) => terms.add(term))
+  }
+
   return Array.from(terms)
 }
 
@@ -1545,6 +1549,10 @@ function scoreEvidence(
     if (/beden|numara|stok|size|stock|variant|secenek|options/.test(combined)) score += 35
   }
 
+  if (/yayinevi|yayinci|publisher|marka|brand/.test(questionText) && item.type === 'brand') {
+    score += 36
+  }
+
   if (intent === 'capacity' && /kapasite|kisilik|oturma|capacity/.test(combined)) score += 35
   if (intent === 'color' && /renk|reng|color|colour|options/.test(combined)) score += 35
   if (intent === 'storage' && /baza|bazali|depolama|hafiza|cekmece|storage|drawer|ssd/.test(combined)) score += 38
@@ -1738,6 +1746,7 @@ function fallbackEvidenceForIntent(
 }
 
 const MAX_PROMPT_EVIDENCE_CHARS = 1_600
+const MAX_EVIDENCE_LINE_CHARS = 420
 const INTENT_SUMMARY_TYPES = new Set<QuestionIntent>([
   'reviews',
   'summary',
@@ -1871,7 +1880,10 @@ export function prepareQuestionEvidence(
 
   const evidenceLines = relevantEvidence.map((item) => {
     const label = item.label ? `${item.label}: ` : ''
-    return `${label}${item.value}`
+    const line = `${label}${item.value}`
+    return line.length > MAX_EVIDENCE_LINE_CHARS
+      ? `${line.slice(0, MAX_EVIDENCE_LINE_CHARS - 1).trimEnd()}…`
+      : line
   })
 
   return {
