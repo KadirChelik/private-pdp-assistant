@@ -10,14 +10,14 @@
       :root{--bg:#f5f2ea;--surface:#fffdf9;--ink:#183126;--muted:#53645b;--line:#d5ddd7;--brand:#173f2b;--accent:#257246}
       *{box-sizing:border-box}
       body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Inter,system-ui,-apple-system,sans-serif}
-      nav{padding:14px 6vw;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px;border-bottom:1px solid #d8ded8;background:#f8f6ef}
+      nav{padding:12px 5vw;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid #d8ded8;background:#f8f6ef}
       .brand{font-weight:800;letter-spacing:.08em;font-size:15px}
       .switcher{display:flex;flex-wrap:wrap;gap:8px}
-      .prod-tab{border:1px solid #cad6ce;border-radius:999px;background:#fff;color:var(--ink);padding:7px 14px;font:650 13px/1.2 inherit;cursor:pointer;transition:all .15s}
+      .prod-tab{border:1px solid #cad6ce;border-radius:999px;background:#fff;color:var(--ink);padding:7px 13px;font:650 13px/1.2 inherit;cursor:pointer;transition:all .15s}
       .prod-tab:hover{border-color:var(--brand);background:#eef5f0}
       .prod-tab.active{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:0 4px 12px #173f2b24}
       .nav-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-      .nav-links{display:flex;gap:18px;font-size:13.5px;color:var(--muted)}
+      .nav-links{display:flex;gap:16px;font-size:13.5px;color:var(--muted);white-space:nowrap}
       .nav-links a{color:inherit;text-decoration:none;font-weight:600}
       .nav-links a:hover{color:var(--ink)}
       .lang-switch{display:inline-flex;align-items:center;padding:3px;border-radius:999px;border:1px solid #cad6ce;background:#fff;gap:2px}
@@ -25,13 +25,12 @@
       .lang-btn:hover{color:var(--ink);background:#eef5f0}
       .lang-btn.active{background:var(--brand);color:#fff}
 
-      .product-detail{max-width:1120px;margin:40px auto;padding:0 24px;display:grid;grid-template-columns:1fr 1fr;gap:52px;align-items:start}
+      .product-detail{max-width:1120px;margin:40px auto 0;padding:0 24px;display:grid;grid-template-columns:1fr 1fr;gap:52px;align-items:start}
       .photo-col{display:flex;flex-direction:column;gap:20px}
-      .photo{min-height:430px;border-radius:28px;background:radial-gradient(circle at 30% 25%,#cfe0d2,#4d735c);display:grid;place-items:center;position:relative;overflow:hidden;box-shadow:0 22px 50px #18312618}
-      .photo[data-theme="shoe"]{background:radial-gradient(circle at 30% 25%,#dbe7f5,#3c5a78)}
-      .photo[data-theme="dress"]{background:radial-gradient(circle at 30% 25%,#f2e6dc,#8c6c56)}
-      .photo-badge{position:absolute;top:18px;left:18px;padding:6px 12px;border-radius:999px;background:#ffffffd9;color:var(--brand);font-size:12px;font-weight:700;letter-spacing:.04em}
-      .photo svg{width:210px;height:210px;filter:drop-shadow(0 18px 28px #10241938)}
+      .photo{aspect-ratio:4/5;border-radius:26px;background:#ede8df;border:1px solid #d9d3c7;position:relative;overflow:hidden;box-shadow:0 22px 50px #18312616}
+      .photo-img{width:100%;height:100%;display:block;object-fit:cover;object-position:center}
+      .photo[data-theme="dress"] .photo-img{object-position:center 15%}
+      .photo-badge{position:absolute;top:16px;left:16px;z-index:2;padding:6px 12px;border-radius:999px;background:#fffdf9eb;backdrop-filter:blur(6px);border:1px solid #d8d3c8;color:var(--brand);font-size:11.5px;font-weight:700;letter-spacing:.04em}
       .reviews-block{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:18px}
       .reviews-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
       .reviews-head strong{font-size:14px}
@@ -53,23 +52,30 @@
       .size-section{margin:16px 0 18px}
       .size-label{font-size:13px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em}
       .size-list{display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;list-style:none}
-      .size-btn{min-width:44px;padding:8px 13px;border-radius:10px;border:1px solid #ccd5ce;background:#fff;color:var(--ink);font-weight:700;font-size:14px;cursor:pointer}
+      .size-btn{min-width:44px;padding:8px 13px;border-radius:10px;border:1px solid #ccd5ce;background:#fff;color:var(--ink);font-weight:700;font-size:14px;cursor:pointer;transition:all .15s}
+      .size-btn:hover:not([disabled]){border-color:var(--brand);background:#eef5f0}
+      .size-btn.selected{background:var(--brand);border-color:var(--brand);color:#fff}
       .size-btn[disabled]{background:#f1f4f2;color:#92a097;text-decoration:line-through;cursor:not-allowed;opacity:.72}
       .model-info{margin:0 0 16px;padding:10px 13px;border-radius:12px;background:#f4f7f5;border:1px solid #d9e2dc;font-size:13.5px;font-weight:600;color:var(--ink)}
-      .buy{width:100%;border:0;border-radius:14px;padding:15px;background:var(--brand);color:#fff;font-weight:700;font-size:16px;cursor:pointer}
+      .buy{width:100%;border:0;border-radius:14px;padding:15px;background:var(--brand);color:#fff;font-weight:700;font-size:16px;cursor:pointer;transition:background .15s}
       .buy:hover{background:#123222}
 
-      /* Pipeline Inspector */
-      .inspector{max-width:1120px;margin:20px auto 80px;padding:0 24px}
-      .inspector-shell{background:var(--surface);border:1px solid var(--line);border-radius:26px;padding:28px;box-shadow:0 18px 50px #18312610}
+      /* Independent Developer Sandbox / Pipeline Inspector */
+      .inspector{background:#e5ebe7;border-top:2px solid #c7d3cb;padding:48px 24px 92px;margin-top:72px}
+      .inspector-inner{max-width:1120px;margin:0 auto}
+      .dev-band-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:16px}
+      .dev-band-tag{display:inline-flex;align-items:center;gap:8px;padding:5px 11px;border-radius:6px;background:#142a1f;color:#c8ead4;font:700 11px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em}
+      .dev-band-note{font-size:13px;color:#3f5549;font-weight:550}
+      .inspector-shell{background:#fcfefd;border:1px solid #c2cec6;border-radius:20px;padding:26px;box-shadow:0 20px 50px #10241912}
       .inspector-top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:16px;padding-bottom:20px;border-bottom:1px solid var(--line)}
       .inspector-eyebrow{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:6px}
-      .inspector-top h2{margin:0 0 6px;font-size:24px;letter-spacing:-.01em}
-      .inspector-top p{margin:0;color:var(--muted);font-size:14px;max-width:650px}
+      .inspector-top h2{margin:0 0 6px;font-size:23px;letter-spacing:-.01em}
+      .inspector-top p{margin:0;color:var(--muted);font-size:14px;max-width:640px}
       .caps{display:flex;flex-wrap:wrap;gap:8px}
-      .cap-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid var(--line);background:#f7faf8;color:var(--ink)}
-      .cap-pill[data-state="ready"]{background:#e8f6ee;border-color:#b8dfc7;color:#175933}
-      .cap-pill[data-state="hybrid"]{background:#eef4ff;border-color:#c8dcff;color:#1d4ed8}
+      .cap-pill{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:6px;font:600 11px/1.25 ui-monospace,SFMono-Regular,Menlo,monospace;border:1px solid #d5ded8;background:#f2f5f3;color:#394d42;pointer-events:none;user-select:text}
+      .cap-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.85}
+      .cap-pill[data-state="ready"]{background:#edf7f0;border-color:#c2decb;color:#175933}
+      .cap-pill[data-state="hybrid"]{background:#eef4ff;border-color:#ccddfb;color:#1d4ed8}
 
       .inspector-controls{margin-top:20px;display:flex;flex-direction:column;gap:12px}
       .chip-row{display:flex;flex-wrap:wrap;gap:8px}
@@ -78,20 +84,24 @@
       .inspector-form{display:flex;gap:10px}
       .inspector-form input{flex:1;min-width:0;padding:11px 14px;border-radius:12px;border:1px solid #c9d4cc;background:#fff;font:14px inherit;color:var(--ink)}
       .inspector-form input:focus{outline:2px solid #84c7a0;border-color:var(--brand)}
-      .inspector-form button{border:0;border-radius:12px;padding:11px 18px;background:var(--brand);color:#fff;font:700 14px inherit;cursor:pointer}
+      .inspector-form button{display:inline-flex;align-items:center;gap:8px;border:0;border-radius:12px;padding:11px 20px;background:var(--brand);color:#fff;font:700 13.5px/1 inherit;cursor:pointer;box-shadow:0 4px 12px #173f2b28;transition:transform .15s,background .15s,box-shadow .15s;white-space:nowrap}
+      .inspector-form button:hover{background:#123222;transform:translateY(-1px);box-shadow:0 6px 16px #173f2b36}
+      .inspector-form button:active{transform:translateY(0)}
+      .inspector-flash{animation:inspector-pulse .42s ease}
+      @keyframes inspector-pulse{0%{box-shadow:0 0 0 3px #3eb97066}100%{box-shadow:0 0 0 0 transparent}}
 
       .payload-banner{margin-top:16px;padding:11px 14px;border-radius:12px;background:#edf4ff;border:1px solid #cfe0fc;color:#1e3a8a;font-size:13px;font-weight:650;display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px}
       .payload-banner[data-gate="true"]{background:#e8f6ee;border-color:#bfe2cd;color:#175933}
 
       .inspector-grid{display:grid;grid-template-columns:1fr 1.35fr;gap:20px;margin-top:18px}
-      .panel-box{background:#f8faf8;border:1px solid var(--line);border-radius:18px;padding:18px}
+      .panel-box{background:#f8faf8;border:1px solid var(--line);border-radius:16px;padding:18px}
       .panel-title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#3d5347}
-      .badge{padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;background:#e4efe8;color:var(--brand);text-transform:none;letter-spacing:0}
+      .badge{padding:3px 9px;border-radius:6px;font-size:11px;font-weight:700;background:#e4efe8;color:var(--brand);text-transform:none;letter-spacing:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
       .ctx-kv{display:grid;gap:8px;font-size:13px}
       .ctx-row{display:flex;justify-content:space-between;gap:12px;padding-bottom:7px;border-bottom:1px solid #e6ece8}
       .ctx-row span{color:var(--muted)}
       .ctx-row strong{text-align:right;color:var(--ink)}
-      .evidence-list{display:grid;gap:10px}
+      .evidence-list{display:grid;gap:10px;border-radius:12px}
       .evidence-item{background:#fff;border:1px solid #dce5df;border-radius:12px;padding:11px 13px;font-size:13px}
       .evidence-meta{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;font-size:11px;color:var(--muted);font-weight:700}
       .evidence-score{color:var(--accent)}
@@ -110,7 +120,8 @@
 
       @media(max-width:860px){
         .product-detail,.inspector-grid,.setup-grid{grid-template-columns:1fr;gap:28px}
-        .photo{min-height:300px}
+        .inspector-form{flex-direction:column}
+        .inspector-form button{justify-content:center}
       }
     </style>
     <script id="product-jsonld" type="application/ld+json">{}</script>
@@ -138,58 +149,64 @@
     <main id="product-root" class="product-detail" itemscope itemtype="https://schema.org/Product"></main>
 
     <section id="pipeline-inspector" class="inspector" data-pdp-assistant-ignore>
-      <div class="inspector-shell">
-        <div class="inspector-top">
-          <div>
-            <div class="inspector-eyebrow" id="inspector-eyebrow">Gizlilik Odaklı Yerel Çıkarım + Minimal Bulut · Canlı İnceleme</div>
-            <h2 id="inspector-title">Canlı Çıkarım &amp; Pipeline Inspector</h2>
-            <p id="inspector-desc">
-              Tarayıcıdaki her mağaza Schema.org JSON-LD verilerini, beden/stok listelerini, renk varyantlarını, teknik tabloları ve yorumları yerelde ayrıştırır (0 HTML, 0 cookie, 0 PII). Sayfa dışı sorular yerelde <strong>0 byte</strong> ile durdurulur; yanıtlanan sorularda yalnızca eşleşen <strong>1–10 kanıt satırı</strong> <code>/api/ask</code> uç noktasına iletilir.
-            </p>
-          </div>
-          <div class="caps">
-            <span id="cap-tier" class="cap-pill" data-state="ready">İndirmesiz · Tüm Tarayıcılarda Çalışır</span>
-            <span id="cap-privacy" class="cap-pill" data-state="hybrid">Gizlilik: 0 HTML · 0 PII · 0 B Kapısı</span>
-          </div>
+      <div class="inspector-inner">
+        <div class="dev-band-head">
+          <span class="dev-band-tag">&lt;/&gt; DEVELOPER SANDBOX</span>
+          <span class="dev-band-note" id="dev-band-note">Mağaza arayüzünden bağımsız teknik inceleyici — widget'ın sayfa içinden ne okuduğunu canlı gösterir</span>
         </div>
-
-        <div class="inspector-controls">
-          <div class="chip-row" id="inspector-chips"></div>
-          <form class="inspector-form" id="inspector-form">
-            <input id="inspector-question" type="text" value="" placeholder="Çıkarımı ve gönderilecek veri boyutunu görmek için bir soru yazın…" aria-label="İncelenecek soru" />
-            <button type="submit" id="inspector-submit">Çıkarımı İncele</button>
-          </form>
-        </div>
-
-        <div id="payload-banner" class="payload-banner" data-gate="false"></div>
-
-        <div class="inspector-grid">
-          <div class="panel-box">
-            <div class="panel-title">
-              <span id="panel-ctx-title">1. Çıkarılan ProductContext</span>
-              <span class="badge" id="ctx-source-badge">yükleniyor…</span>
+        <div class="inspector-shell">
+          <div class="inspector-top">
+            <div>
+              <div class="inspector-eyebrow" id="inspector-eyebrow">Gizlilik Odaklı Yerel Çıkarım + Minimal Bulut · Canlı İnceleme</div>
+              <h2 id="inspector-title">Canlı Çıkarım &amp; Pipeline Inspector</h2>
+              <p id="inspector-desc">
+                Tarayıcıdaki her mağaza Schema.org JSON-LD verilerini, beden/stok listelerini, renk varyantlarını, teknik tabloları ve yorumları yerelde ayrıştırır (0 HTML, 0 cookie, 0 PII). Sayfa dışı sorular yerelde <strong>0 byte</strong> ile durdurulur; yanıtlanan sorularda yalnızca eşleşen <strong>1–10 kanıt satırı</strong> <code>/api/ask</code> uç noktasına iletilir.
+              </p>
             </div>
-            <div class="ctx-kv" id="ctx-summary"></div>
+            <div class="caps">
+              <span id="cap-tier" class="cap-pill" data-state="ready">İndirmesiz · Tüm Tarayıcılarda Çalışır</span>
+              <span id="cap-privacy" class="cap-pill" data-state="hybrid">Gizlilik: 0 HTML · 0 PII · 0 B Kapısı</span>
+            </div>
           </div>
 
-          <div class="panel-box">
-            <div class="panel-title">
-              <span id="panel-ret-title">2. Niyet &amp; Kanıt Eşleştirme</span>
-              <span class="badge" id="retrieval-intent-badge">niyet: —</span>
-            </div>
-            <div id="retrieval-results" class="evidence-list"></div>
+          <div class="inspector-controls">
+            <div class="chip-row" id="inspector-chips"></div>
+            <form class="inspector-form" id="inspector-form">
+              <input id="inspector-question" type="text" value="" placeholder="Çıkarımı ve gönderilecek veri boyutunu görmek için bir soru yazın…" aria-label="İncelenecek soru" />
+              <button type="submit" id="inspector-submit"><span id="inspector-submit-label">Çıkarımı İncele</span><span aria-hidden="true">→</span></button>
+            </form>
           </div>
-        </div>
 
-        <div class="setup-grid">
-          <div class="snippet-box">
-            <div class="snippet-head">
-              <span id="snippet-title">DevTools Konsoluyla Herhangi Bir E-Ticaret PDP Sayfasına Enjekte Et</span>
-              <button type="button" class="copy-btn" id="copy-snippet">Kopyala</button>
+          <div id="payload-banner" class="payload-banner" data-gate="false"></div>
+
+          <div class="inspector-grid">
+            <div class="panel-box">
+              <div class="panel-title">
+                <span id="panel-ctx-title">1. Çıkarılan ProductContext</span>
+                <span class="badge" id="ctx-source-badge">yükleniyor…</span>
+              </div>
+              <div class="ctx-kv" id="ctx-summary"></div>
             </div>
-            <pre id="inject-snippet">(()=>{const s=document.createElement('script');s.src='https://private-pdp-assistant.vercel.app/private-pdp-assistant.js';s.onerror=()=>console.warn('[PDP Assistant] Blocked by this site CSP.');document.head.append(s)})()</pre>
+
+            <div class="panel-box">
+              <div class="panel-title">
+                <span id="panel-ret-title">2. Niyet &amp; Kanıt Eşleştirme</span>
+                <span class="badge" id="retrieval-intent-badge">niyet: —</span>
+              </div>
+              <div id="retrieval-results" class="evidence-list"></div>
+            </div>
           </div>
-          <div class="flags-box" id="arch-box"></div>
+
+          <div class="setup-grid">
+            <div class="snippet-box">
+              <div class="snippet-head">
+                <span id="snippet-title">DevTools Konsoluyla Herhangi Bir E-Ticaret PDP Sayfasına Enjekte Et</span>
+                <button type="button" class="copy-btn" id="copy-snippet">Kopyala</button>
+              </div>
+              <pre id="inject-snippet">(()=>{const s=document.createElement('script');s.src='https://private-pdp-assistant.vercel.app/private-pdp-assistant.js';s.onerror=()=>console.warn('[PDP Assistant] Blocked by this site CSP.');document.head.append(s)})()</pre>
+            </div>
+            <div class="flags-box" id="arch-box"></div>
+          </div>
         </div>
       </div>
     </section>
@@ -210,6 +227,7 @@
               shoe: 'Koşu Ayakkabısı',
               dress: 'Keten Elbise',
             },
+            devBandNote: "Mağaza arayüzünden bağımsız teknik inceleyici — widget'ın sayfa içinden ne okuduğunu canlı gösterir",
             eyebrow: 'Gizlilik Odaklı Yerel Çıkarım + Minimal Bulut · Canlı İnceleme',
             title: 'Canlı Çıkarım & Pipeline Inspector',
             desc: 'Her tarayıcı Schema.org JSON-LD verilerini, beden/stok durumlarını, renk varyantlarını, manken ölçülerini ve yorumları yerelde ayrıştırır (0 HTML, 0 cookie, 0 PII). Sayfa dışı sorular <strong>0 byte</strong> ile yerelde durdurulur; yanıtlanan sorularda yalnızca eşleşen <strong>1–10 kanıt satırı</strong> <code>/api/ask</code> uç noktasına gönderilir.',
@@ -262,6 +280,7 @@
               shoe: 'Running Shoe',
               dress: 'Linen Dress',
             },
+            devBandNote: 'Independent engineering diagnostics below the mock storefront — inspects what the widget extracts in-browser',
             eyebrow: 'Privacy-First Local Retrieval + Minimized Cloud · Live Diagnostics',
             title: 'Live Extraction & Pipeline Inspector',
             desc: 'Every browser extracts Schema.org JSON-LD, size/stock availability, color variants, model measurements, and reviews locally (0 HTML, 0 cookies, 0 PII sent). Out-of-page questions stop at <strong>0 bytes</strong> locally, while answered queries send only <strong>1–10 matched facts</strong> to <code>/api/ask</code>.',
@@ -343,7 +362,7 @@
               reviewsHeading: 'Müşteri Yorumları',
               reviewsSub: '★ 4.8 / 5 (3 yorum)',
               description: 'Uzun doğa yürüyüşleri ve şehir içi günlük kullanım için tasarlanmış suya dayanıklı sırt çantası. Havalandırmalı sırt paneli ve ergonomik omuz askıları yükü gün boyu dengeli taşır.',
-              svg: '<svg viewBox="0 0 128 128" fill="none" aria-hidden="true"><path d="M44 26c0-9 9-14 20-14s20 5 20 14" stroke="#173f2b" stroke-width="6" stroke-linecap="round"/><rect x="28" y="26" width="72" height="86" rx="22" fill="#173f2b"/><path d="M36 48c0-8 6-14 14-14h28c8 0 14 6 14 14v12H36V48Z" fill="#235b3f"/><rect x="42" y="68" width="44" height="30" rx="10" fill="#2d6e4c"/><path d="M56 54h16" stroke="#b9dfc7" stroke-width="4" stroke-linecap="round"/><path d="M48 76h32" stroke="#b9dfc7" stroke-width="3" stroke-linecap="round"/></svg>',
+              image: '/products/terra-pack.jpg',
               specs: [
                 ['Kapasite', '28 litre'],
                 ['Ağırlık', '980 g'],
@@ -392,7 +411,7 @@
               reviewsHeading: 'Müşteri Yorumları',
               reviewsSub: '★ 4.6 / 5 (3 yorum)',
               description: 'Günlük tempo koşuları ve uzun mesafe antrenmanları için geliştirilen hafif koşu ayakkabısı. Çift yoğunluklu EVA orta taban darbe emilimi sağlarken nefes alan file saya ayağı serin tutar.',
-              svg: '<svg viewBox="0 0 128 128" fill="none" aria-hidden="true"><path d="M18 76c16 0 24-22 34-26l14 14c10 9 26 9 42 12 4 1 6 5 6 10v6H18V76Z" fill="#1b3a57"/><path d="M18 88h96v10c0 4-3 7-7 7H25c-4 0-7-3-7-7V88Z" fill="#e6eef7"/><path d="M50 56l18 14" stroke="#8ab4e1" stroke-width="4" stroke-linecap="round"/><path d="M40 66l14 10" stroke="#8ab4e1" stroke-width="4" stroke-linecap="round"/></svg>',
+              image: '/products/aerostride-shoe.jpg',
               specs: [
                 ['Taban', 'EVA orta taban + Kauçuk dış taban'],
                 ['Kalıp', 'Tam kalıp'],
@@ -445,7 +464,7 @@
               reviewsHeading: 'Müşteri Yorumları',
               reviewsSub: '★ 4.9 / 5 (3 yorum)',
               description: 'Sıcak yaz günleri ve açık hava davetleri için tasarlanmış nefes alan %100 doğal keten midi elbise. İnce pamuklu iç astarı sayesinde iç göstermez ve rahat kesimiyle gün boyu konfor sunar.',
-              svg: '<svg viewBox="0 0 128 128" fill="none" aria-hidden="true"><path d="M48 22l16 10 16-10 8 20-10 6 14 58H36l14-58-10-6 8-20Z" fill="#5c4232"/><path d="M50 48h28" stroke="#e9d8ca" stroke-width="3" stroke-linecap="round"/></svg>',
+              image: '/products/solis-dress.jpg',
               specs: [
                 ['Kumaş', '%100 Doğal Keten'],
                 ['Kalıp', 'Rahat kesim'],
@@ -501,7 +520,7 @@
               reviewsHeading: 'Customer Reviews',
               reviewsSub: '★ 4.8 / 5 (3 reviews)',
               description: 'A weather-resistant daypack built for long trails and short escapes. Ventilated back panel and contoured shoulder straps keep the load comfortable all day.',
-              svg: '<svg viewBox="0 0 128 128" fill="none" aria-hidden="true"><path d="M44 26c0-9 9-14 20-14s20 5 20 14" stroke="#173f2b" stroke-width="6" stroke-linecap="round"/><rect x="28" y="26" width="72" height="86" rx="22" fill="#173f2b"/><path d="M36 48c0-8 6-14 14-14h28c8 0 14 6 14 14v12H36V48Z" fill="#235b3f"/><rect x="42" y="68" width="44" height="30" rx="10" fill="#2d6e4c"/><path d="M56 54h16" stroke="#b9dfc7" stroke-width="4" stroke-linecap="round"/><path d="M48 76h32" stroke="#b9dfc7" stroke-width="3" stroke-linecap="round"/></svg>',
+              image: '/products/terra-pack.jpg',
               specs: [
                 ['Capacity', '28 litres'],
                 ['Weight', '980 g'],
@@ -550,7 +569,7 @@
               reviewsHeading: 'Customer Reviews',
               reviewsSub: '★ 4.6 / 5 (3 reviews)',
               description: 'Lightweight running shoe engineered for daily tempo runs and long-distance training. A dual-density EVA midsole absorbs impact while the breathable engineered mesh upper keeps your feet cool.',
-              svg: '<svg viewBox="0 0 128 128" fill="none" aria-hidden="true"><path d="M18 76c16 0 24-22 34-26l14 14c10 9 26 9 42 12 4 1 6 5 6 10v6H18V76Z" fill="#1b3a57"/><path d="M18 88h96v10c0 4-3 7-7 7H25c-4 0-7-3-7-7V88Z" fill="#e6eef7"/><path d="M50 56l18 14" stroke="#8ab4e1" stroke-width="4" stroke-linecap="round"/><path d="M40 66l14 10" stroke="#8ab4e1" stroke-width="4" stroke-linecap="round"/></svg>',
+              image: '/products/aerostride-shoe.jpg',
               specs: [
                 ['Sole', 'EVA midsole + Rubber outsole'],
                 ['Fit', 'True to size'],
@@ -603,7 +622,7 @@
               reviewsHeading: 'Customer Reviews',
               reviewsSub: '★ 4.9 / 5 (3 reviews)',
               description: 'Breathable 100% natural linen midi dress designed for warm summer days and outdoor events. A soft cotton inner lining ensures opaque coverage with a relaxed cut for all-day comfort.',
-              svg: '<svg viewBox="0 0 128 128" fill="none" aria-hidden="true"><path d="M48 22l16 10 16-10 8 20-10 6 14 58H36l14-58-10-6 8-20Z" fill="#5c4232"/><path d="M50 48h28" stroke="#e9d8ca" stroke-width="3" stroke-linecap="round"/></svg>',
+              image: '/products/solis-dress.jpg',
               specs: [
                 ['Fabric', '100% Natural Linen'],
                 ['Fit', 'Relaxed fit'],
@@ -666,12 +685,13 @@
         const langSwitchGroupEl = document.querySelector('.lang-switch')
         const langButtons = Array.from(document.querySelectorAll('.lang-btn'))
         const eyebrowEl = document.getElementById('inspector-eyebrow')
+        const devBandNoteEl = document.getElementById('dev-band-note')
         const inspectorTitleEl = document.getElementById('inspector-title')
         const inspectorDescEl = document.getElementById('inspector-desc')
         const tierBadge = document.getElementById('cap-tier')
         const privacyBadge = document.getElementById('cap-privacy')
         const inputEl = document.getElementById('inspector-question')
-        const submitBtn = document.getElementById('inspector-submit')
+        const submitLabelEl = document.getElementById('inspector-submit-label')
         const panelCtxTitleEl = document.getElementById('panel-ctx-title')
         const panelRetTitleEl = document.getElementById('panel-ret-title')
         const snippetTitleEl = document.getElementById('snippet-title')
@@ -719,6 +739,7 @@
             btn.setAttribute('aria-pressed', String(active))
           })
 
+          if (devBandNoteEl) devBandNoteEl.textContent = t.devBandNote
           eyebrowEl.textContent = t.eyebrow
           inspectorTitleEl.textContent = t.title
           inspectorDescEl.innerHTML = t.desc
@@ -727,7 +748,7 @@
           privacyBadge.textContent = t.capPrivacy
           inputEl.placeholder = t.inputPlaceholder
           inputEl.setAttribute('aria-label', t.inputAriaLabel)
-          submitBtn.textContent = t.submitBtn
+          if (submitLabelEl) submitLabelEl.textContent = t.submitBtn
           panelCtxTitleEl.textContent = t.panelCtxTitle
           panelRetTitleEl.textContent = t.panelRetTitle
           snippetTitleEl.textContent = t.snippetTitle
@@ -739,7 +760,11 @@
           currentProductKey = key && PRODUCTS[currentLang][key] ? key : 'backpack'
           const p = PRODUCTS[currentLang][currentProductKey]
           document.documentElement.lang = p.lang
-          jsonLdEl.textContent = JSON.stringify(p.jsonLd)
+          let resolvedImage = p.image
+          try {
+            resolvedImage = new URL(p.image, window.location.origin).href
+          } catch {}
+          jsonLdEl.textContent = JSON.stringify(Object.assign({}, p.jsonLd, { image: resolvedImage }))
 
           const specsHtml = p.specs.map(function (pair) {
             return '<li><span>' + esc(pair[0]) + '</span><strong>' + esc(pair[1]) + '</strong></li>'
@@ -751,7 +776,7 @@
                 p.sizes.map(function (item) {
                   const label = typeof item === 'string' ? item : item.label
                   const inStock = typeof item === 'string' ? true : item.inStock !== false
-                  return '<li><button type="button" class="size-btn"' +
+                  return '<li><button type="button" class="size-btn" aria-pressed="false"' +
                     (inStock ? '' : ' disabled title="' + esc(p.outOfStockTitle || 'Out of stock') + '"') +
                     '>' + esc(label) + '</button></li>'
                 }).join('') +
@@ -769,8 +794,9 @@
 
           productRoot.innerHTML =
             '<div class="photo-col">' +
-              '<div class="photo" data-theme="' + esc(p.theme) + '" role="img" aria-label="' + esc(p.title) + '">' +
-                '<span class="photo-badge">' + esc(p.badge) + '</span>' + p.svg +
+              '<div class="photo" data-theme="' + esc(p.theme) + '">' +
+                '<span class="photo-badge">' + esc(p.badge) + '</span>' +
+                '<img itemprop="image" class="photo-img" src="' + esc(p.image) + '" alt="' + esc(p.title) + '" loading="eager" />' +
               '</div>' +
               '<section class="reviews-block" aria-label="' + esc(p.reviewsHeading) + '">' +
                 '<div class="reviews-head"><strong>' + esc(p.reviewsHeading) + '</strong><span>' + esc(p.reviewsSub) + '</span></div>' +
@@ -792,6 +818,19 @@
               '<ul class="specs">' + specsHtml + '</ul>' +
               '<button class="buy" type="button">' + esc(p.buyLabel) + '</button>' +
             '</section>'
+
+          const sizeBtns = Array.from(productRoot.querySelectorAll('.size-btn:not([disabled])'))
+          sizeBtns.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+              sizeBtns.forEach(function (other) {
+                const isThis = other === btn
+                other.classList.toggle('selected', isThis)
+                other.setAttribute('aria-pressed', String(isThis))
+              })
+              window.PDPAssistant && window.PDPAssistant.refresh && window.PDPAssistant.refresh()
+              renderInspector(inputEl.value)
+            })
+          })
 
           chipsContainer.innerHTML = p.chips.map(function (q, idx) {
             return '<button type="button" class="q-chip' + (idx === 0 ? ' active' : '') + '" data-q="' + esc(q) + '">' + esc(q) + '</button>'
@@ -918,12 +957,34 @@
           })
         })
 
+        function pulseInspector() {
+          ;[payloadBanner, resultsEl].forEach(function (el) {
+            if (!el) return
+            el.classList.remove('inspector-flash')
+            void el.offsetWidth
+            el.classList.add('inspector-flash')
+          })
+        }
+
+        let inputDebounceTimer = null
+        inputEl.addEventListener('input', function () {
+          clearTimeout(inputDebounceTimer)
+          inputDebounceTimer = setTimeout(function () {
+            Array.from(chipsContainer.querySelectorAll('.q-chip')).forEach(function (btn) {
+              btn.classList.toggle('active', btn.dataset.q === inputEl.value.trim())
+            })
+            renderInspector(inputEl.value)
+          }, 120)
+        })
+
         document.getElementById('inspector-form').addEventListener('submit', function (e) {
           e.preventDefault()
+          clearTimeout(inputDebounceTimer)
           Array.from(chipsContainer.querySelectorAll('.q-chip')).forEach(function (btn) {
             btn.classList.toggle('active', btn.dataset.q === inputEl.value.trim())
           })
           renderInspector(inputEl.value)
+          pulseInspector()
         })
 
         document.getElementById('copy-snippet').addEventListener('click', async function (e) {

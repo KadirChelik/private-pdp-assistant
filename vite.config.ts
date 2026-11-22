@@ -18,6 +18,30 @@ function emitDemoHtmlPlugin(): Plugin {
       if (fs.existsSync(faviconSrc)) {
         fs.copyFileSync(faviconSrc, path.join(distDir, 'favicon.svg'))
       }
+
+      const productsSrc = path.resolve(process.cwd(), 'public', 'products')
+      if (fs.existsSync(productsSrc)) {
+        fs.cpSync(productsSrc, path.join(distDir, 'products'), { recursive: true })
+      }
+    },
+    configureServer(server) {
+      server.middlewares.use('/products', (req, res, next) => {
+        const cleanRel = (req.url || '').split('?')[0].replace(/^\/+/, '')
+        if (!cleanRel || cleanRel.includes('..')) return next()
+        const filePath = path.resolve(process.cwd(), 'public', 'products', cleanRel)
+        if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) return next()
+        const ext = path.extname(filePath).toLowerCase()
+        const mime =
+          ext === '.webp'
+            ? 'image/webp'
+            : ext === '.jpg' || ext === '.jpeg'
+              ? 'image/jpeg'
+              : ext === '.png'
+                ? 'image/png'
+                : 'application/octet-stream'
+        res.setHeader('Content-Type', mime)
+        fs.createReadStream(filePath).pipe(res)
+      })
     },
   }
 }

@@ -9,7 +9,7 @@ import { isTurkishText, prepareQuestionEvidence } from './retrieval'
 import { styles } from './styles'
 import type { ChatTurn, ProductContext } from './types'
 
-const robotIcon = `<svg viewBox="0 0 24 24" aria-hidden="true" class="pdp-robot-icon"><path d="M12 3v3"/><circle cx="12" cy="3" r="1"/><rect x="4.5" y="6" width="15" height="12.5" rx="4"/><path d="M4.5 11H3m18 0h-1.5M9 15h6"/><circle cx="9" cy="11.5" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="11.5" r="1" fill="currentColor" stroke="none"/></svg>`
+const conciergeIcon = `<svg viewBox="0 0 24 24" aria-hidden="true" class="pdp-brand-icon"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5c-1.35 0-2.62-.32-3.75-.88L3.5 20.5l1.38-4.75A8.46 8.46 0 0 1 4 11.5a8.5 8.5 0 1 1 17 0Z"/><path d="M8.75 10.25h6.5"/><path d="M8.75 13.75h4.25"/></svg>`
 const sendIcon = `<svg viewBox="0 0 24 24" fill="none"><path d="m4 12 16-8-6 16-2.6-5.4L4 12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`
 
 type RuntimeMode = 'hybrid' | 'offline'
@@ -80,9 +80,9 @@ export class AssistantWidget {
   mount(): void {
     this.disposed = false
     this.root.innerHTML = `<style>${styles}</style>
-      <button class="pdp-launcher" aria-label="Open product assistant" aria-expanded="false" aria-controls="pdp-assistant-panel">${robotIcon}<span class="pdp-launcher-ring"></span></button>
+      <button class="pdp-launcher" aria-label="Open product assistant" aria-expanded="false" aria-controls="pdp-assistant-panel">${conciergeIcon}<span class="pdp-launcher-label">Ask about product</span><span class="pdp-launcher-ring"></span></button>
       <section id="pdp-assistant-panel" class="pdp-panel pdp-hidden" role="dialog" aria-modal="true" aria-label="Product assistant">
-        <header class="pdp-header"><div class="pdp-mark">${robotIcon}</div><div class="pdp-heading"><strong>Private PDP Assist</strong><span class="pdp-header-sub"><i class="pdp-dot"></i> Local-retrieval product assistant</span></div><button class="pdp-icon pdp-close" aria-label="Close"><span aria-hidden="true">×</span></button></header>
+        <header class="pdp-header"><div class="pdp-mark">${conciergeIcon}</div><div class="pdp-heading"><strong>Private PDP Assist</strong><span class="pdp-header-sub"><i class="pdp-dot"></i> Local-retrieval product assistant</span></div><button class="pdp-icon pdp-close" aria-label="Close"><span aria-hidden="true">×</span></button></header>
         <main class="pdp-body" aria-live="polite"></main>
         <footer class="pdp-composer pdp-hidden"><div class="pdp-suggestions" aria-label="Suggested questions"></div><form class="pdp-form"><input aria-label="Ask about this product" placeholder="Ask about this product…" maxlength="500" autocomplete="off"><button class="pdp-send" aria-label="Send" disabled>${sendIcon}</button></form><div class="pdp-privacy">Local retrieval · Only matched facts leave device when cloud needed</div></footer>
       </section>`
@@ -525,6 +525,9 @@ export class AssistantWidget {
   private applyChromeLanguage(isTurkish: boolean): void {
     const launcher = this.root.querySelector<HTMLElement>('.pdp-launcher')
     if (launcher) launcher.setAttribute('aria-label', isTurkish ? 'Ürün asistanını aç' : 'Open product assistant')
+
+    const launcherLabel = this.root.querySelector<HTMLElement>('.pdp-launcher-label')
+    if (launcherLabel) launcherLabel.textContent = isTurkish ? 'Ürünü Sor' : 'Ask about product'
 
     const panel = this.root.querySelector<HTMLElement>('.pdp-panel')
     if (panel) panel.setAttribute('aria-label', isTurkish ? 'Ürün asistanı' : 'Product assistant')
