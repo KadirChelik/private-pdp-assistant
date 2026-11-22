@@ -81,12 +81,9 @@
       .chip-row{display:flex;flex-wrap:wrap;gap:8px}
       .q-chip{border:1px solid #cbd7cf;border-radius:999px;background:#f4f7f4;color:var(--ink);padding:7px 13px;font:600 13px/1.2 inherit;cursor:pointer;transition:all .15s}
       .q-chip:hover,.q-chip.active{background:var(--brand);border-color:var(--brand);color:#fff}
-      .inspector-form{display:flex;gap:10px}
-      .inspector-form input{flex:1;min-width:0;padding:11px 14px;border-radius:12px;border:1px solid #c9d4cc;background:#fff;font:14px inherit;color:var(--ink)}
+      .inspector-form{display:block}
+      .inspector-form input{width:100%;padding:12px 15px;border-radius:12px;border:1px solid #c9d4cc;background:#fff;font:14px inherit;color:var(--ink)}
       .inspector-form input:focus{outline:2px solid #84c7a0;border-color:var(--brand)}
-      .inspector-form button{display:inline-flex;align-items:center;gap:8px;border:0;border-radius:12px;padding:11px 20px;background:var(--brand);color:#fff;font:700 13.5px/1 inherit;cursor:pointer;box-shadow:0 4px 12px #173f2b28;transition:transform .15s,background .15s,box-shadow .15s;white-space:nowrap}
-      .inspector-form button:hover{background:#123222;transform:translateY(-1px);box-shadow:0 6px 16px #173f2b36}
-      .inspector-form button:active{transform:translateY(0)}
       .inspector-flash{animation:inspector-pulse .42s ease}
       @keyframes inspector-pulse{0%{box-shadow:0 0 0 3px #3eb97066}100%{box-shadow:0 0 0 0 transparent}}
 
@@ -120,8 +117,6 @@
 
       @media(max-width:860px){
         .product-detail,.inspector-grid,.setup-grid{grid-template-columns:1fr;gap:28px}
-        .inspector-form{flex-direction:column}
-        .inspector-form button{justify-content:center}
       }
     </style>
     <script id="product-jsonld" type="application/ld+json">{}</script>
@@ -173,7 +168,6 @@
             <div class="chip-row" id="inspector-chips"></div>
             <form class="inspector-form" id="inspector-form">
               <input id="inspector-question" type="text" value="" placeholder="Çıkarımı ve gönderilecek veri boyutunu görmek için bir soru yazın…" aria-label="İncelenecek soru" />
-              <button type="submit" id="inspector-submit"><span id="inspector-submit-label">Çıkarımı İncele</span><span aria-hidden="true">→</span></button>
             </form>
           </div>
 
@@ -233,9 +227,8 @@
             desc: 'Her tarayıcı Schema.org JSON-LD verilerini, beden/stok durumlarını, renk varyantlarını, manken ölçülerini ve yorumları yerelde ayrıştırır (0 HTML, 0 cookie, 0 PII). Sayfa dışı sorular <strong>0 byte</strong> ile yerelde durdurulur; yanıtlanan sorularda yalnızca eşleşen <strong>1–10 kanıt satırı</strong> <code>/api/ask</code> uç noktasına gönderilir.',
             capReady: 'İndirmesiz · Tüm Tarayıcılarda Çalışır',
             capPrivacy: 'Gizlilik: 0 HTML · 0 PII · 0 B Kapısı',
-            inputPlaceholder: 'Çıkarımı ve gönderilecek kanıt yükünü incelemek için bir soru sorun…',
+            inputPlaceholder: 'Özel bir soru yazın; çıkarım ve gönderilecek kanıt yükü anlık güncellensin…',
             inputAriaLabel: 'İncelenecek ürün sorusu',
-            submitBtn: 'Çıkarımı İncele',
             panelCtxTitle: '1. Çıkarılan ProductContext',
             panelRetTitle: '2. Niyet & Kanıt Eşleştirme',
             loadingBadge: 'yükleniyor…',
@@ -286,9 +279,8 @@
             desc: 'Every browser extracts Schema.org JSON-LD, size/stock availability, color variants, model measurements, and reviews locally (0 HTML, 0 cookies, 0 PII sent). Out-of-page questions stop at <strong>0 bytes</strong> locally, while answered queries send only <strong>1–10 matched facts</strong> to <code>/api/ask</code>.',
             capReady: 'Zero-Download · Works Everywhere',
             capPrivacy: 'Privacy: 0 HTML · 0 PII · 0 B Gate',
-            inputPlaceholder: 'Ask any EN or TR question to trace extraction & minimized payload…',
+            inputPlaceholder: 'Type any EN or TR question to trace live extraction & minimized payload…',
             inputAriaLabel: 'Question to inspect',
-            submitBtn: 'Inspect Retrieval',
             panelCtxTitle: '1. Extracted ProductContext',
             panelRetTitle: '2. Intent & Grounded Retrieval',
             loadingBadge: 'loading…',
@@ -691,7 +683,6 @@
         const tierBadge = document.getElementById('cap-tier')
         const privacyBadge = document.getElementById('cap-privacy')
         const inputEl = document.getElementById('inspector-question')
-        const submitLabelEl = document.getElementById('inspector-submit-label')
         const panelCtxTitleEl = document.getElementById('panel-ctx-title')
         const panelRetTitleEl = document.getElementById('panel-ret-title')
         const snippetTitleEl = document.getElementById('snippet-title')
@@ -748,7 +739,6 @@
           privacyBadge.textContent = t.capPrivacy
           inputEl.placeholder = t.inputPlaceholder
           inputEl.setAttribute('aria-label', t.inputAriaLabel)
-          if (submitLabelEl) submitLabelEl.textContent = t.submitBtn
           panelCtxTitleEl.textContent = t.panelCtxTitle
           panelRetTitleEl.textContent = t.panelRetTitle
           snippetTitleEl.textContent = t.snippetTitle
@@ -943,6 +933,7 @@
             btn.classList.toggle('active', btn.dataset.q === q)
           })
           renderInspector(q)
+          pulseInspector()
         }
 
         productTabs.forEach(function (tab) {
