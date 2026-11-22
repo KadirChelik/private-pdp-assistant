@@ -1622,7 +1622,7 @@ function scoreEvidence(
   if (intent === 'color' && /renk|reng|color|colour/.test(combined)) score += 35
   if (intent === 'storage' && /baza|bazali|depolama|hafiza|cekmece|storage|drawer|ssd/.test(combined)) score += 38
 
-  if (intent === 'material') {
+  if (intent === 'material' || isMaterialContext(questionText)) {
     if (
       /malzeme|materyal|kumas|metal|ahsap|mdf|sunta|profil|yay|sunger|kasa|taban|iskelet|material|fabric|wood|nylon|ripstop|leather|cotton|polyester|steel|aluminum|plastic|keten|pamuk|linen|file|mesh|eva|kaucuk|rubber|deri|yun|wool|ipek|silk|viskon|denim|celik|silikon/.test(
         combined,
@@ -2005,7 +2005,17 @@ export function prepareQuestionEvidence(
     : (detectedIntent === 'summary' || detectedIntent === 'suitability')
       ? fallbackEvidenceForIntent(detectedIntent, evidenceIndex)
       : []
-  const itemLimit = maxEvidenceItems ?? (INTENT_SUMMARY_TYPES.has(detectedIntent) ? 10 : 5)
+  const normQuestion = normalize(cleanQuestion)
+  const isCompoundQuery =
+    [
+      isDimensionContext(normQuestion),
+      isMaterialContext(normQuestion),
+      isFitContext(normQuestion),
+      isCareContext(normQuestion),
+      isDeliveryContext(normQuestion),
+    ].filter(Boolean).length >= 2
+  const itemLimit =
+    maxEvidenceItems ?? (INTENT_SUMMARY_TYPES.has(detectedIntent) || isCompoundQuery ? 8 : 5)
   const relevantEvidence = capEvidenceChars(
     refineEvidence(cleanQuestion, rawCandidates).slice(0, itemLimit),
   )

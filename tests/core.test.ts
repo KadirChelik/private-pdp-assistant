@@ -1305,8 +1305,11 @@ test('extractProductContext handles split external PDP DOM containers, collapsed
       </ul>
       <div class="modal-accordion-content dimensions-detail" style="display:none">
         <p>Genişlik: 80 cm</p>
+        <p>Derinlik: 28 cm</p>
         <p>Yükseklik: 202 cm</p>
+        <p>Ana malzeme: Sunta, Kağıt folyo</p>
       </div>
+      <table><tr><th>Taksit</th><th>Taksit Tutarı · Toplam Tutar</th></tr></table>
     </div>
     <section data-pdp-assistant-ignore>
       <ul class="specs"><li><span>Leaked Spec</span><strong>Never Extract</strong></li></ul>
@@ -1320,10 +1323,15 @@ test('extractProductContext handles split external PDP DOM containers, collapsed
     assert.equal(ctx.specs['Sayfa Sayısı'], '236')
     assert.equal(ctx.specs['Paper Type'], '3. Hamur')
     assert.equal(ctx.specs['Genişlik'], '80 cm')
+    assert.equal(ctx.specs['Taksit'], undefined)
     assert.equal(ctx.specs['Leaked Spec'], undefined)
 
     const qs = getSuggestedQuestions(ctx)
-    assert.ok(!qs.some((q) => /upc|tax|number of reviews|availability|excluded/i.test(q)))
+    assert.ok(!qs.some((q) => /upc|tax|taksit|number of reviews|availability|excluded/i.test(q)))
+
+    const compound = prepareQuestionEvidence(ctx, 'Ölçüleri ve malzemesi nedir?')
+    assert.ok(compound.relevantEvidence.some((item) => /80 cm/.test(item.value)))
+    assert.ok(compound.relevantEvidence.some((item) => /Sunta/.test(item.value)))
   } finally {
     restore()
   }

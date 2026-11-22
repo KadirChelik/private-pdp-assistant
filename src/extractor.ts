@@ -347,7 +347,7 @@ const COLLAPSED_SPEC_CONTAINER_SELECTOR =
   '[class*="product-info" i],[class*="dimension" i],[class*="measure" i],[class*="spec" i],[class*="attribute" i],[class*="property" i],[class*="ozellik" i],[class*="tab" i],[class*="accordion" i],[class*="collapse" i],[role="tabpanel"],#productDetails_techSpec_section_1,#productDetails_detailBullets_sections1,#detailBullets_feature_div'
 
 const SPEC_JUNK_LINE =
-  /^(?:mağazalar|giriş yap|üye ol|sepete ekle|favorilerim|daha fazla bilgi|ilgili kategoriler|kvkk|gizlilik|teslimat ve iade|ödeme seçenekleri)$/i
+  /^(?:mağazalar|giriş yap|üye ol|sepete ekle|favorilerim|daha fazla bilgi|ilgili kategoriler|kvkk|gizlilik|teslimat ve iade|ödeme seçenekleri|taksit(?:\s*seçenekleri)?|taksit\s*tutarı(?:\s*·\s*toplam\s*tutar)?|toplam\s*tutar)$/i
 
 function isInsideExcludedContainer(element: Element): boolean {
   return Boolean(element.closest(EXCLUDED_CONTAINER_SELECTOR))
@@ -991,7 +991,7 @@ export function getSuggestedQuestions(context: ProductContext): string[] {
   }
 
   // 13. Dynamic spec questions for any remaining attributes on arbitrary websites
-  const NOISY_SPEC_KEY = /\b(?:sku|barkod|barcode|gtin|ean|mpn|isbn|kod|code|id|model\s*no|urun\s*kodu|stok\s*kodu|upc|asin|price|fiyat|liste\s*fiyat|tax|kdv|vergi|number\s*of\s*reviews|yorum\s*sayis|availability|stok\s*durum|product\s*type|urun\s*tipi|magazalar|ilgili\s*kategoriler)\b/i
+  const NOISY_SPEC_KEY = /\b(?:sku|barkod|barcode|gtin|ean|mpn|isbn|kod|code|id|model\s*no|urun\s*kodu|stok\s*kodu|upc|asin|price|fiyat|liste\s*fiyat|tax|kdv|vergi|taksit|odeme|number\s*of\s*reviews|yorum\s*sayis|availability|stok\s*durum|product\s*type|urun\s*tipi|magazalar|ilgili\s*kategoriler)\b/i
   for (const [key, rawValue] of Object.entries(specs)) {
     if (questions.length >= Math.min(5, maxBeforeReviews)) break
     if (coveredSpecKeys.has(key)) continue
