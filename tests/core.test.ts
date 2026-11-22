@@ -1453,3 +1453,29 @@ test('EN demo dress/shoe and TR demo pack localize model measurements, cart pric
     restorePackTr()
   }
 })
+
+test('short selectedSize (M) and boolean spec values (Var) do not trigger false substring hits for absent attributes', () => {
+  const restore = installDom(`<!doctype html><html lang="tr"><body>
+    <main class="product-detail">
+      <h1>Solis %100 Keten Midi Elbise</h1>
+      <div class="price">2.190 TL</div>
+      <ul class="size-list">
+        <li><button type="button" class="size-btn">S</button></li>
+        <li><button type="button" class="size-btn selected" aria-pressed="true">M</button></li>
+      </ul>
+      <ul class="specs">
+        <li><span>Kumaş</span><strong>%100 Doğal Keten</strong></li>
+        <li><span>Cep</span><strong>Var</strong></li>
+      </ul>
+    </main>
+  </body></html>`, 'https://demo.test/?lang=tr')
+
+  try {
+    const ctx = extractProductContext()
+    assert.equal(ctx.selectedSize, 'M')
+    const absent = prepareQuestionEvidence(ctx, 'Bluetooth var mı?')
+    assert.deepEqual(absent.relevantEvidence, [])
+  } finally {
+    restore()
+  }
+})

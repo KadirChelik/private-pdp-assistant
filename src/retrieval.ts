@@ -1500,8 +1500,14 @@ function scoreEvidence(
 
   let score = 0
 
-  if (labelText && questionText.includes(labelText)) score += 35
-  if (valueText && questionText.includes(valueText)) score += 18
+  if (labelText.length >= 3 && questionText.includes(labelText)) score += 35
+  if (
+    valueText.length >= 4 &&
+    !/^(?:evet|hayir|true|false)$/.test(valueText) &&
+    questionText.includes(valueText)
+  ) {
+    score += 18
+  }
 
   const wordMap = new Map<string, string[]>()
   const wordsFor = (target: string): string[] => {
